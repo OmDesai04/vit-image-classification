@@ -1,0 +1,6 @@
+.venv/
+dataset/
+split_dataset/
+outputs/
+__pycache__/
+*.pyc

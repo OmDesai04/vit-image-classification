@@ -1,0 +1,30 @@
+# Vision Transformer Image Classification - Requirements
+# Python 3.8+
+
+# Deep Learning Framework
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Vision Transformer Models
+timm>=0.9.0
+
+# Image Processing
+Pillow>=9.0.0
+opencv-python>=4.7.0
+
+# Data Processing and Analysis
+numpy>=1.23.0
+pandas>=1.5.0
+
+# Visualization
+matplotlib>=3.6.0
+seaborn>=0.12.0
+
+# Machine Learning Utilities
+scikit-learn>=1.2.0
+
+# Progress Bars
+tqdm>=4.65.0
+
+# Optional: For GPU acceleration (install separately based on your CUDA version)
+# Visit https://pytorch.org/ for installation instructions
