@@ -127,6 +127,20 @@ class Trainer:
         plt.close()
 
 
+    # ----------- ADDED (DO NOT CHANGE EXISTING) -----------
+    def plot_normalized_confusion_matrix(self, cm):
+        cm_normalized = cm.astype(float) / cm.sum(axis=1, keepdims=True)
+
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(cm_normalized, cmap="Blues")
+        plt.xlabel("Predicted")
+        plt.ylabel("True")
+        plt.title("Confusion Matrix (Normalized)")
+        plt.savefig(self.output_dir / "confusion_matrix_normalized.png", dpi=300)
+        plt.close()
+    # -----------------------------------------------------
+
+
     def train(self):
         for epoch in range(self.config['epochs']):
             start_time = time.time()
@@ -151,7 +165,6 @@ class Trainer:
             print(f"  Epoch Time:     {epoch_time:.2f} min")
             print("-" * 60)
 
-            # Early stopping
             if val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
                 self.early_stopping_counter = 0
@@ -162,7 +175,11 @@ class Trainer:
                     print("\nEarly stopping triggered.")
                     break
 
+        # Existing confusion matrix
         self.plot_confusion_matrix(cm)
+
+        # NEW normalized confusion matrix
+        self.plot_normalized_confusion_matrix(cm)
 
         print("\nFINAL VALIDATION METRICS")
         print(f"Accuracy : {self.history['val_acc'][-1]*100:.2f}%")
