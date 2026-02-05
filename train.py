@@ -373,7 +373,7 @@ def main():
         'learning_rate': 5e-5,
         'weight_decay': 0.1,
         'model_name': 'ghostnet_050',  # GhostNet-0.5x (1.39M params)
-        'pretrained': True,
+        'pretrained': False,  # No pretrained weights available
         'freeze_backbone': False,
         'output_dir': "/content/drive/MyDrive/outputs"
     }

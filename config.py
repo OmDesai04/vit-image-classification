@@ -7,7 +7,7 @@ DATA_CONFIG = {
 
 MODEL_CONFIG = {
     'model_name': 'ghostnet_050',  # GhostNet-0.5x (1.39M params) - Low accuracy
-    'pretrained': True,
+    'pretrained': False,  # No pretrained weights available for ghostnet_050
     'freeze_backbone': False,
 }
 
