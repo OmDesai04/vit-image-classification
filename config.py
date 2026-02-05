@@ -6,7 +6,7 @@ DATA_CONFIG = {
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_tiny_patch16_224',  # ViT-Tiny (5.54M params) - Smallest pure ViT
+    'model_name': 'vit_base_patch16_224',  # ViT-Base (85.85M params) - Pure ViT with patch16
     'pretrained': True,  # Use pretrained weights
     'freeze_backbone': False,
 }

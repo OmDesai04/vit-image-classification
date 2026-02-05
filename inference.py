@@ -275,7 +275,7 @@ def main():
                        help='Path to save predictions CSV')
     parser.add_argument('--class-names', type=str, default='outputs/class_names.json',
                        help='Path to class names JSON file')
-    parser.add_argument('--model-name', type=str, default='vit_tiny_patch16_224',
+    parser.add_argument('--model-name', type=str, default='vit_base_patch16_224',
                        help='ViT model variant name')
     
     args = parser.parse_args()
