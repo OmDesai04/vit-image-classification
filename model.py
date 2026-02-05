@@ -14,7 +14,7 @@ class VisionTransformerClassifier(nn.Module):
     Uses a pretrained ViT backbone with a custom classification head.
     """
     
-    def __init__(self, num_classes, model_name='vit_base_patch16_224', pretrained=True):
+    def __init__(self, num_classes, model_name='vit_base_patch32_224', pretrained=True):
         """
         Initialize the Vision Transformer model
         
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     num_classes = 65  # Example: 65 classes (l=-32 to l=32)
     model = create_model(
         num_classes=num_classes,
-        model_name='vit_base_patch16_224',
+        model_name='vit_base_patch32_224',
         pretrained=True,
         freeze_backbone=False
     )

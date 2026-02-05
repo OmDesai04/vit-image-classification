@@ -372,7 +372,7 @@ def main():
         'epochs': 30,
         'learning_rate': 5e-5,
         'weight_decay': 0.1,
-        'model_name': 'vit_base_patch16_224',  # ViT-Base (85.85M params) - Pure ViT with patch16
+        'model_name': 'vit_base_patch32_224',  # ViT-Base (87.51M params) - Pure ViT with patch32
         'pretrained': True,  # Use pretrained ImageNet weights
         'freeze_backbone': False,
         'output_dir': "/content/drive/MyDrive/outputs"
