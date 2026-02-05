@@ -6,8 +6,8 @@ DATA_CONFIG = {
 }
 
 MODEL_CONFIG = {
-    'model_name': 'ghostnet_050',  # GhostNet-0.5x (1.39M params) - Low accuracy
-    'pretrained': False,  # No pretrained weights available for ghostnet_050
+    'model_name': 'vit_tiny_patch16_224',  # ViT-Tiny (5.54M params) - Smallest pure ViT
+    'pretrained': True,  # Use pretrained weights
     'freeze_backbone': False,
 }
 

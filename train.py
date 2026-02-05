@@ -372,8 +372,8 @@ def main():
         'epochs': 30,
         'learning_rate': 5e-5,
         'weight_decay': 0.1,
-        'model_name': 'ghostnet_050',  # GhostNet-0.5x (1.39M params)
-        'pretrained': False,  # No pretrained weights available
+        'model_name': 'vit_tiny_patch16_224',  # ViT-Tiny (5.54M params) - Pure ViT
+        'pretrained': True,  # Use pretrained ImageNet weights
         'freeze_backbone': False,
         'output_dir': "/content/drive/MyDrive/outputs"
     }

@@ -14,7 +14,7 @@ class VisionTransformerClassifier(nn.Module):
     Uses a pretrained ViT backbone with a custom classification head.
     """
     
-    def __init__(self, num_classes, model_name='vit_base_patch16_224', pretrained=True):
+    def __init__(self, num_classes, model_name='vit_tiny_patch16_224', pretrained=True):
         """
         Initialize the Vision Transformer model
         
@@ -97,7 +97,7 @@ class VisionTransformerClassifier(nn.Module):
         return trainable_params, total_params
 
 
-def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True, freeze_backbone=False):
+def create_model(num_classes, model_name='vit_tiny_patch16_224', pretrained=True, freeze_backbone=False):
     """
     Create and configure a Vision Transformer model
     
@@ -128,7 +128,7 @@ def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True
     return model
 
 
-def load_model(checkpoint_path, num_classes, model_name='vit_base_patch16_224', device='cuda'):
+def load_model(checkpoint_path, num_classes, model_name='vit_tiny_patch16_224', device='cuda'):
     """
     Load a trained model from checkpoint
     
@@ -174,9 +174,9 @@ def load_model(checkpoint_path, num_classes, model_name='vit_base_patch16_224', 
 
 # Available ViT model variants in timm (as of 2026)
 AVAILABLE_MODELS = {
-    'vit_tiny_patch16_224': 'ViT-Tiny (5.7M params) - Fastest',
+    'vit_tiny_patch16_224': 'ViT-Tiny (5.54M params) - Smallest pure ViT (Current)',
     'vit_small_patch16_224': 'ViT-Small (22M params) - Good balance',
-    'vit_base_patch16_224': 'ViT-Base (86M params) - Recommended',
+    'vit_base_patch16_224': 'ViT-Base (86M params) - High accuracy',
     'vit_large_patch16_224': 'ViT-Large (304M params) - Most accurate',
 }
 
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     num_classes = 65  # Example: 65 classes (l=-32 to l=32)
     model = create_model(
         num_classes=num_classes,
-        model_name='vit_base_patch16_224',
+        model_name='vit_tiny_patch16_224',
         pretrained=True,
         freeze_backbone=False
     )

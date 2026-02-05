@@ -228,7 +228,7 @@ def main():
         'num_workers': 4,
         'image_size': 224,
         'model_path': 'outputs/best_model.pth',
-        'model_name': 'vit_base_patch16_224',
+        'model_name': 'vit_tiny_patch16_224',
         'output_dir': 'outputs'
     }
     

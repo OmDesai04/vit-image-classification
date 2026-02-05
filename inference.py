@@ -13,7 +13,7 @@ from model import load_model
 
 class ImageClassifier:
     
-    def __init__(self, model_path, class_names, model_name='vit_base_patch16_224', device='cuda', image_size=224):
+    def __init__(self, model_path, class_names, model_name='vit_tiny_patch16_224', device='cuda', image_size=224):
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         self.class_names = class_names
         self.num_classes = len(class_names)
@@ -127,7 +127,7 @@ class ImageClassifier:
         return result
 
 
-def predict_single_image(model_path, image_path, class_names_path, model_name='vit_base_patch16_224'):
+def predict_single_image(model_path, image_path, class_names_path, model_name='vit_tiny_patch16_224'):
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
     
@@ -154,7 +154,7 @@ def predict_single_image(model_path, image_path, class_names_path, model_name='v
     return result
 
 
-def predict_from_directory(model_path, image_dir, class_names_path, output_csv, model_name='vit_base_patch16_224'):
+def predict_from_directory(model_path, image_dir, class_names_path, output_csv, model_name='vit_tiny_patch16_224'):
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
     
@@ -186,7 +186,7 @@ def predict_from_directory(model_path, image_dir, class_names_path, output_csv, 
     return results
 
 
-def create_prediction_table(test_dir, model_path, class_names_path, output_csv, model_name='vit_base_patch16_224'):
+def create_prediction_table(test_dir, model_path, class_names_path, output_csv, model_name='vit_tiny_patch16_224'):
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
     
@@ -275,7 +275,7 @@ def main():
                        help='Path to save predictions CSV')
     parser.add_argument('--class-names', type=str, default='outputs/class_names.json',
                        help='Path to class names JSON file')
-    parser.add_argument('--model-name', type=str, default='vit_base_patch16_224',
+    parser.add_argument('--model-name', type=str, default='vit_tiny_patch16_224',
                        help='ViT model variant name')
     
     args = parser.parse_args()
