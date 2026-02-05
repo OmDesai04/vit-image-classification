@@ -331,13 +331,6 @@ def print_training_info(config, device, train_loader, val_loader, num_classes, m
     print(f"   Validation Batches: {len(val_loader)}")
     print(f"   Image Size: {config['image_size']}x{config['image_size']}")
     print(f"   Batch Size: {config['batch_size']}")
-    
-    # Class Distribution
-    if hasattr(train_loader.dataset, 'get_class_distribution'):
-        train_dist = train_loader.dataset.get_class_distribution()
-        print(f"\n   Class Distribution (Training):")
-        for class_name, count in train_dist.items():
-            print(f"      {class_name}: {count} images")
     print("-" * 80)
     
     # Model Information
