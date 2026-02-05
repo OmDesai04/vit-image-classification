@@ -51,7 +51,7 @@ class Trainer:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.best_val_loss = float('inf')
-        self.early_stopping_patience = 7
+        self.early_stopping_patience = 5
         self.early_stopping_counter = 0
 
         self.history = {
