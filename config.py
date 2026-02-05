@@ -6,7 +6,7 @@ DATA_CONFIG = {
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_base_patch16_224',
+    'model_name': 'mobilevit_s',
     'pretrained': True,
     'freeze_backbone': False,
 }

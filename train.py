@@ -55,17 +55,23 @@ class Trainer:
         self.early_stopping_counter = 0
 
         self.history = {
+            'train_loss': [],
             'train_acc': [],
+            'val_loss': [],
             'val_acc': [],
             'precision': [],
             'recall': [],
-            'f1': []
+            'f1': [],
+            'epoch_times': []
         }
+        
+        self.total_training_time = 0
 
 
     def train_epoch(self, epoch):
         self.model.train()
         correct, total = 0, 0
+        total_loss = 0
 
         for images, labels in tqdm(self.train_loader, desc=f"Epoch {epoch+1} [Train]"):
             images, labels = images.to(self.device), labels.to(self.device)
@@ -77,11 +83,12 @@ class Trainer:
             loss.backward()
             self.optimizer.step()
 
+            total_loss += loss.item() * images.size(0)
             preds = torch.argmax(outputs, dim=1)
             correct += (preds == labels).sum().item()
             total += labels.size(0)
 
-        return correct / total
+        return correct / total, total_loss / total
 
 
     def validate(self, epoch):
@@ -141,52 +148,225 @@ class Trainer:
     # -----------------------------------------------------
 
 
-    def train(self):
-        for epoch in range(self.config['epochs']):
-            start_time = time.time()
+    def plot_accuracy_graph(self):
+        plt.figure(figsize=(10, 6))
+        epochs = range(1, len(self.history['train_acc']) + 1)
+        plt.plot(epochs, [acc * 100 for acc in self.history['train_acc']], 'b-', label='Training Accuracy', linewidth=2)
+        plt.plot(epochs, [acc * 100 for acc in self.history['val_acc']], 'r-', label='Validation Accuracy', linewidth=2)
+        plt.xlabel('Epochs', fontsize=12)
+        plt.ylabel('Accuracy (%)', fontsize=12)
+        plt.title('Training vs Validation Accuracy', fontsize=14, fontweight='bold')
+        plt.legend(fontsize=10)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(self.output_dir / "accuracy_graph.png", dpi=300)
+        plt.close()
 
-            train_acc = self.train_epoch(epoch)
+
+    def plot_loss_graph(self):
+        plt.figure(figsize=(10, 6))
+        epochs = range(1, len(self.history['train_loss']) + 1)
+        plt.plot(epochs, self.history['train_loss'], 'b-', label='Training Loss', linewidth=2)
+        plt.plot(epochs, self.history['val_loss'], 'r-', label='Validation Loss', linewidth=2)
+        plt.xlabel('Epochs', fontsize=12)
+        plt.ylabel('Loss', fontsize=12)
+        plt.title('Training vs Validation Loss', fontsize=14, fontweight='bold')
+        plt.legend(fontsize=10)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(self.output_dir / "loss_graph.png", dpi=300)
+        plt.close()
+
+
+    def plot_metrics_graph(self):
+        plt.figure(figsize=(10, 6))
+        epochs = range(1, len(self.history['precision']) + 1)
+        plt.plot(epochs, self.history['precision'], 'g-', label='Precision', linewidth=2)
+        plt.plot(epochs, self.history['recall'], 'b-', label='Recall', linewidth=2)
+        plt.plot(epochs, self.history['f1'], 'r-', label='F1 Score', linewidth=2)
+        plt.xlabel('Epochs', fontsize=12)
+        plt.ylabel('Score', fontsize=12)
+        plt.title('Precision, Recall, and F1 Score', fontsize=14, fontweight='bold')
+        plt.legend(fontsize=10)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(self.output_dir / "metrics_graph.png", dpi=300)
+        plt.close()
+
+
+    def save_metrics_to_file(self):
+        import json
+        
+        metrics = {
+            'training_summary': {
+                'total_epochs': len(self.history['train_acc']),
+                'best_val_loss': float(self.best_val_loss),
+                'total_training_time': self.format_time(self.total_training_time)
+            },
+            'final_metrics': {
+                'train_accuracy': float(self.history['train_acc'][-1]),
+                'val_accuracy': float(self.history['val_acc'][-1]),
+                'precision': float(self.history['precision'][-1]),
+                'recall': float(self.history['recall'][-1]),
+                'f1_score': float(self.history['f1'][-1])
+            },
+            'per_epoch_metrics': {
+                'train_loss': [float(x) for x in self.history['train_loss']],
+                'train_accuracy': [float(x) for x in self.history['train_acc']],
+                'val_loss': [float(x) for x in self.history['val_loss']],
+                'val_accuracy': [float(x) for x in self.history['val_acc']],
+                'precision': [float(x) for x in self.history['precision']],
+                'recall': [float(x) for x in self.history['recall']],
+                'f1_score': [float(x) for x in self.history['f1']],
+                'epoch_times': [self.format_time(t) for t in self.history['epoch_times']]
+            },
+            'model_config': self.config
+        }
+        
+        with open(self.output_dir / 'training_metrics.json', 'w') as f:
+            json.dump(metrics, f, indent=4)
+        
+        print(f"\n✅ All metrics saved to: {self.output_dir / 'training_metrics.json'}")
+
+
+    def format_time(self, seconds):
+        minutes = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{minutes} min {secs} sec"
+
+
+    def train(self):
+        training_start_time = time.time()
+        
+        for epoch in range(self.config['epochs']):
+            epoch_start_time = time.time()
+
+            train_acc, train_loss = self.train_epoch(epoch)
             val_loss, val_acc, precision, recall, f1, cm = self.validate(epoch)
 
             self.scheduler.step(val_loss)
 
-            epoch_time = (time.time() - start_time) / 60
+            epoch_time = time.time() - epoch_start_time
 
+            self.history['train_loss'].append(train_loss)
             self.history['train_acc'].append(train_acc)
+            self.history['val_loss'].append(val_loss)
             self.history['val_acc'].append(val_acc)
             self.history['precision'].append(precision)
             self.history['recall'].append(recall)
             self.history['f1'].append(f1)
+            self.history['epoch_times'].append(epoch_time)
 
-            print(f"\nEpoch {epoch+1}")
+            print(f"\nEpoch {epoch+1}/{self.config['epochs']}")
+            print(f"  Train Loss:     {train_loss:.4f}")
             print(f"  Train Accuracy: {train_acc*100:.2f}%")
+            print(f"  Val Loss:       {val_loss:.4f}")
             print(f"  Val Accuracy:   {val_acc*100:.2f}%")
+            print(f"  Precision:      {precision:.4f}")
+            print(f"  Recall:         {recall:.4f}")
             print(f"  F1 Score:       {f1:.4f}")
-            print(f"  Epoch Time:     {epoch_time:.2f} min")
+            print(f"  Epoch Time:     {self.format_time(epoch_time)}")
             print("-" * 60)
 
             if val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
                 self.early_stopping_counter = 0
                 torch.save(self.model.state_dict(), self.output_dir / "best_model.pth")
+                print("  ✅ Model saved!")
             else:
                 self.early_stopping_counter += 1
                 if self.early_stopping_counter >= self.early_stopping_patience:
-                    print("\nEarly stopping triggered.")
+                    print("\n⚠️  Early stopping triggered.")
                     break
 
-        # Existing confusion matrix
+        self.total_training_time = time.time() - training_start_time
+        
+        print("\n" + "="*80)
+        print(" " * 30 + "TRAINING COMPLETED")
+        print("="*80)
+        print(f"\n⏱️  Total Training Time: {self.format_time(self.total_training_time)}")
+        print(f"📊 Total Epochs: {len(self.history['train_acc'])}")
+        
+        print("\n📈 FINAL VALIDATION METRICS:")
+        print(f"   Accuracy:  {self.history['val_acc'][-1]*100:.2f}%")
+        print(f"   Precision: {self.history['precision'][-1]:.4f}")
+        print(f"   Recall:    {self.history['recall'][-1]:.4f}")
+        print(f"   F1 Score:  {self.history['f1'][-1]:.4f}")
+        print("="*80)
+        
+        # Save all visualizations and metrics
+        print("\n💾 Saving results...")
         self.plot_confusion_matrix(cm)
-
-        # NEW normalized confusion matrix
         self.plot_normalized_confusion_matrix(cm)
+        self.plot_accuracy_graph()
+        self.plot_loss_graph()
+        self.plot_metrics_graph()
+        self.save_metrics_to_file()
+        
+        print("\n✅ All graphs and metrics saved successfully!")
+        print(f"📁 Output directory: {self.output_dir}")
+        print("="*80 + "\n")
 
-        print("\nFINAL VALIDATION METRICS")
-        print(f"Accuracy : {self.history['val_acc'][-1]*100:.2f}%")
-        print(f"Precision: {self.history['precision'][-1]:.4f}")
-        print(f"Recall   : {self.history['recall'][-1]:.4f}")
-        print(f"F1 Score : {self.history['f1'][-1]:.4f}")
-        print("=" * 60)
+
+def print_training_info(config, device, train_loader, val_loader, num_classes, model):
+    """Print detailed information about model, dataset, and training configuration."""
+    print("\n" + "="*80)
+    print(" " * 25 + "TRAINING CONFIGURATION")
+    print("="*80)
+    
+    # Device Information
+    print("\n📱 DEVICE INFORMATION:")
+    print(f"   Device: {device}")
+    if torch.cuda.is_available():
+        print(f"   GPU Name: {torch.cuda.get_device_name(0)}")
+        print(f"   GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
+    print("-" * 80)
+    
+    # Dataset Information
+    print("\n📊 DATASET INFORMATION:")
+    print(f"   Number of Classes: {num_classes}")
+    print(f"   Training Samples: {len(train_loader.dataset)}")
+    print(f"   Validation Samples: {len(val_loader.dataset)}")
+    print(f"   Training Batches: {len(train_loader)}")
+    print(f"   Validation Batches: {len(val_loader)}")
+    print(f"   Image Size: {config['image_size']}x{config['image_size']}")
+    print(f"   Batch Size: {config['batch_size']}")
+    
+    # Class Distribution
+    if hasattr(train_loader.dataset, 'get_class_distribution'):
+        train_dist = train_loader.dataset.get_class_distribution()
+        print(f"\n   Class Distribution (Training):")
+        for class_name, count in train_dist.items():
+            print(f"      {class_name}: {count} images")
+    print("-" * 80)
+    
+    # Model Information
+    print("\n🤖 MODEL INFORMATION:")
+    print(f"   Model Name: {config['model_name']}")
+    print(f"   Pretrained: {config['pretrained']}")
+    print(f"   Freeze Backbone: {config['freeze_backbone']}")
+    
+    # Count parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"   Total Parameters: {total_params:,}")
+    print(f"   Trainable Parameters: {trainable_params:,}")
+    print(f"   Non-trainable Parameters: {total_params - trainable_params:,}")
+    print("-" * 80)
+    
+    # Training Configuration
+    print("\n⚙️  TRAINING CONFIGURATION:")
+    print(f"   Epochs: {config['epochs']}")
+    print(f"   Learning Rate: {config['learning_rate']}")
+    print(f"   Weight Decay: {config['weight_decay']}")
+    print(f"   Optimizer: AdamW")
+    print(f"   Scheduler: ReduceLROnPlateau")
+    print(f"   Loss Function: CrossEntropyLoss")
+    print(f"   Output Directory: {config['output_dir']}")
+    print("-" * 80)
+    
+    print("\n🚀 STARTING TRAINING...")
+    print("="*80 + "\n")
 
 
 def main():
@@ -198,14 +378,13 @@ def main():
         'epochs': 30,
         'learning_rate': 1e-4,
         'weight_decay': 0.01,
-        'model_name': 'vit_base_patch16_224',
+        'model_name': 'mobilevit_s',
         'pretrained': True,
         'freeze_backbone': False,
         'output_dir': "/content/drive/MyDrive/outputs"
     }
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"\nUsing device: {device}")
 
     train_loader, val_loader, _, num_classes, _ = create_dataloaders(
         config['data_root'],
@@ -220,6 +399,9 @@ def main():
         config['pretrained'],
         config['freeze_backbone']
     )
+
+    # Print detailed information before training
+    print_training_info(config, device, train_loader, val_loader, num_classes, model)
 
     trainer = Trainer(model, train_loader, val_loader, device, config)
     trainer.train()
