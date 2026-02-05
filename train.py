@@ -372,7 +372,7 @@ def main():
         'epochs': 30,
         'learning_rate': 5e-5,
         'weight_decay': 0.1,
-        'model_name': 'mobilevit_s',
+        'model_name': 'shufflenet_v2_x0_5',  # ShuffleNet v2 0.5x (~1.4M params)
         'pretrained': True,
         'freeze_backbone': False,
         'output_dir': "/content/drive/MyDrive/outputs"

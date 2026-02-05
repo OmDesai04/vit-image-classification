@@ -1,21 +1,39 @@
+"""
+Vision Transformer (ViT) Model for Image Classification
+This module defines the ViT model with transfer learning capabilities.
+"""
+
 import torch
 import torch.nn as nn
 import timm
 
 
 class VisionTransformerClassifier(nn.Module):
+    """
+    Vision Transformer model for image classification.
+    Uses a pretrained ViT backbone with a custom classification head.
+    """
     
     def __init__(self, num_classes, model_name='vit_base_patch16_224', pretrained=True):
+        """
+        Initialize the Vision Transformer model
+        
+        Args:
+            num_classes (int): Number of output classes
+            model_name (str): Name of the ViT model from timm library
+            pretrained (bool): Whether to use pretrained weights
+        """
         super(VisionTransformerClassifier, self).__init__()
         
         self.num_classes = num_classes
         self.model_name = model_name
         
+        # Load pretrained ViT model from timm
+        # timm provides various ViT variants optimized for different use cases
         self.vit = timm.create_model(
             model_name,
             pretrained=pretrained,
-            num_classes=num_classes,
-            drop_rate=0.3  # Add dropout for regularization
+            num_classes=num_classes
         )
         
         print(f"\n{'='*60}")
@@ -28,12 +46,27 @@ class VisionTransformerClassifier(nn.Module):
         print(f"{'='*60}\n")
     
     def forward(self, x):
+        """
+        Forward pass through the model
+        
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, 3, 224, 224)
+            
+        Returns:
+            torch.Tensor: Output logits of shape (batch_size, num_classes)
+        """
         return self.vit(x)
     
     def freeze_backbone(self):
+        """
+        Freeze the backbone (all layers except the classification head)
+        Useful for initial fine-tuning with limited data
+        """
+        # Freeze all parameters
         for param in self.vit.parameters():
             param.requires_grad = False
         
+        # Unfreeze the classification head
         if hasattr(self.vit, 'head'):
             for param in self.vit.head.parameters():
                 param.requires_grad = True
@@ -44,18 +77,39 @@ class VisionTransformerClassifier(nn.Module):
         print("Backbone frozen. Only classification head will be trained.")
     
     def unfreeze_backbone(self):
+        """
+        Unfreeze all layers for full fine-tuning
+        """
         for param in self.vit.parameters():
             param.requires_grad = True
         
         print("All layers unfrozen. Full model will be trained.")
     
     def get_num_params(self):
+        """
+        Get the number of trainable and total parameters
+        
+        Returns:
+            tuple: (trainable_params, total_params)
+        """
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in self.parameters())
         return trainable_params, total_params
 
 
 def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True, freeze_backbone=False):
+    """
+    Create and configure a Vision Transformer model
+    
+    Args:
+        num_classes (int): Number of output classes
+        model_name (str): Name of the ViT model variant
+        pretrained (bool): Whether to use pretrained weights
+        freeze_backbone (bool): Whether to freeze the backbone initially
+        
+    Returns:
+        VisionTransformerClassifier: Configured model
+    """
     model = VisionTransformerClassifier(
         num_classes=num_classes,
         model_name=model_name,
@@ -65,6 +119,7 @@ def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True
     if freeze_backbone:
         model.freeze_backbone()
     
+    # Print parameter count
     trainable_params, total_params = model.get_num_params()
     print(f"Trainable parameters: {trainable_params:,}")
     print(f"Total parameters: {total_params:,}")
@@ -74,23 +129,40 @@ def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True
 
 
 def load_model(checkpoint_path, num_classes, model_name='vit_base_patch16_224', device='cuda'):
+    """
+    Load a trained model from checkpoint
+    
+    Args:
+        checkpoint_path (str): Path to the checkpoint file
+        num_classes (int): Number of output classes
+        model_name (str): Name of the ViT model variant
+        device (str): Device to load the model on
+        
+    Returns:
+        VisionTransformerClassifier: Loaded model
+    """
+    # Create model architecture
     model = VisionTransformerClassifier(
         num_classes=num_classes,
         model_name=model_name,
-        pretrained=False
+        pretrained=False  # Don't load pretrained weights when loading from checkpoint
     )
     
+    # Load checkpoint
     checkpoint = torch.load(checkpoint_path, map_location=device)
     
+    # Load model state
     if 'model_state_dict' in checkpoint:
         model.load_state_dict(checkpoint['model_state_dict'])
         print(f"Model loaded from {checkpoint_path}")
         
+        # Print additional checkpoint info if available
         if 'epoch' in checkpoint:
             print(f"Checkpoint epoch: {checkpoint['epoch']}")
         if 'val_accuracy' in checkpoint:
             print(f"Validation accuracy: {checkpoint['val_accuracy']:.4f}")
     else:
+        # Legacy format: direct state dict
         model.load_state_dict(checkpoint)
         print(f"Model loaded from {checkpoint_path} (legacy format)")
     
@@ -100,6 +172,7 @@ def load_model(checkpoint_path, num_classes, model_name='vit_base_patch16_224', 
     return model
 
 
+# Available ViT model variants in timm (as of 2026)
 AVAILABLE_MODELS = {
     'vit_tiny_patch16_224': 'ViT-Tiny (5.7M params) - Fastest',
     'vit_small_patch16_224': 'ViT-Small (22M params) - Good balance',
@@ -109,9 +182,13 @@ AVAILABLE_MODELS = {
 
 
 if __name__ == "__main__":
+    """
+    Test the model creation
+    """
     print("Testing Vision Transformer model creation...\n")
     
-    num_classes = 65
+    # Create a test model
+    num_classes = 65  # Example: 65 classes (l=-32 to l=32)
     model = create_model(
         num_classes=num_classes,
         model_name='vit_base_patch16_224',
@@ -119,7 +196,8 @@ if __name__ == "__main__":
         freeze_backbone=False
     )
     
-    dummy_input = torch.randn(2, 3, 224, 224)
+    # Test forward pass
+    dummy_input = torch.randn(2, 3, 224, 224)  # Batch of 2 images
     with torch.no_grad():
         output = model(dummy_input)
     
@@ -128,6 +206,7 @@ if __name__ == "__main__":
     print(f"Output shape: {output.shape}")
     print(f"Output contains logits (before softmax)")
     
+    # Apply softmax to get probabilities
     probabilities = torch.softmax(output, dim=1)
     print(f"Probabilities sum: {probabilities.sum(dim=1)}")
     

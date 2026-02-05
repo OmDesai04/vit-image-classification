@@ -6,7 +6,7 @@ DATA_CONFIG = {
 }
 
 MODEL_CONFIG = {
-    'model_name': 'mobilevit_s',
+    'model_name': 'shufflenet_v2_x0_5',  # ShuffleNet v2 0.5x (~1.4M params) - Lower accuracy than MobileViT
     'pretrained': True,
     'freeze_backbone': False,
 }
