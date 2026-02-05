@@ -32,8 +32,8 @@ class Trainer:
         self.device = device
         self.config = config
 
-        # Label smoothing to prevent 100% accuracy and overconfidence
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+        # Strong label smoothing to prevent 100% accuracy and overconfidence
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=0.2)
 
         self.optimizer = optim.AdamW(
             self.model.parameters(),
@@ -370,8 +370,8 @@ def main():
         'num_workers': 2,
         'image_size': 224,
         'epochs': 30,
-        'learning_rate': 1e-4,
-        'weight_decay': 0.05,
+        'learning_rate': 5e-5,
+        'weight_decay': 0.1,
         'model_name': 'mobilevit_s',
         'pretrained': True,
         'freeze_backbone': False,

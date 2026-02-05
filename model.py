@@ -14,7 +14,8 @@ class VisionTransformerClassifier(nn.Module):
         self.vit = timm.create_model(
             model_name,
             pretrained=pretrained,
-            num_classes=num_classes
+            num_classes=num_classes,
+            drop_rate=0.3  # Add dropout for regularization
         )
         
         print(f"\n{'='*60}")
