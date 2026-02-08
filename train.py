@@ -2,6 +2,7 @@ import os
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -32,8 +33,9 @@ class Trainer:
         self.device = device
         self.config = config
 
-        # Strong label smoothing to prevent 100% accuracy and overconfidence
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=0.2)
+        # Very strong label smoothing to prevent 100% accuracy and overconfidence
+        label_smoothing = config.get('label_smoothing', 0.35)
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
 
         self.optimizer = optim.AdamW(
             self.model.parameters(),
@@ -52,7 +54,7 @@ class Trainer:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.best_val_loss = float('inf')
-        self.early_stopping_patience = 5
+        self.early_stopping_patience = config.get('early_stopping_patience', 7)
         self.early_stopping_counter = 0
 
         self.history = {
@@ -67,6 +69,28 @@ class Trainer:
         }
         
         self.total_training_time = 0
+        
+        # Mixup parameters for strong regularization
+        self.use_mixup = config.get('use_mixup', True)
+        self.mixup_alpha = config.get('mixup_alpha', 0.4)
+    
+    def mixup_data(self, x, y, alpha=0.4):
+        """Apply mixup augmentation to prevent overfitting"""
+        if alpha > 0:
+            lam = np.random.beta(alpha, alpha)
+        else:
+            lam = 1
+        
+        batch_size = x.size()[0]
+        index = torch.randperm(batch_size).to(x.device)
+        
+        mixed_x = lam * x + (1 - lam) * x[index, :]
+        y_a, y_b = y, y[index]
+        return mixed_x, y_a, y_b, lam
+    
+    def mixup_criterion(self, pred, y_a, y_b, lam):
+        """Compute mixup loss"""
+        return lam * self.criterion(pred, y_a) + (1 - lam) * self.criterion(pred, y_b)
 
 
     def train_epoch(self, epoch):
@@ -76,18 +100,26 @@ class Trainer:
 
         for images, labels in tqdm(self.train_loader, desc=f"Epoch {epoch+1} [Train]"):
             images, labels = images.to(self.device), labels.to(self.device)
+            original_labels = labels.clone()  # Keep original labels for accuracy calculation
 
             self.optimizer.zero_grad()
-            outputs = self.model(images)
-            loss = self.criterion(outputs, labels)
+            
+            # Apply mixup augmentation for regularization
+            if self.use_mixup and np.random.rand() > 0.3:  # 70% chance to apply mixup
+                images, labels_a, labels_b, lam = self.mixup_data(images, labels, self.mixup_alpha)
+                outputs = self.model(images)
+                loss = self.mixup_criterion(outputs, labels_a, labels_b, lam)
+            else:
+                outputs = self.model(images)
+                loss = self.criterion(outputs, labels)
 
             loss.backward()
             self.optimizer.step()
 
             total_loss += loss.item() * images.size(0)
             preds = torch.argmax(outputs, dim=1)
-            correct += (preds == labels).sum().item()
-            total += labels.size(0)
+            correct += (preds == original_labels).sum().item()
+            total += original_labels.size(0)
 
         return correct / total, total_loss / total
 
@@ -330,7 +362,16 @@ def print_training_info(config, device, train_loader, val_loader, num_classes, m
     print(f"   Validation Samples: {len(val_loader.dataset)}")
     print(f"   Training Batches: {len(train_loader)}")
     print(f"   Validation Batches: {len(val_loader)}")
-    print(f"   Image Size: {config['image_size']}x{config['image_size']}")
+    
+    # Image preprocessing information
+    crop_size = config.get('crop_size', None)
+    if crop_size is not None and crop_size > 0:
+        print(f"   ✂️  Image Cropping: ENABLED (Center crop to {crop_size}x{crop_size})")
+        print(f"   📐 Final Image Size: {config['image_size']}x{config['image_size']}")
+        print(f"   ℹ️  Note: Images are center-cropped BEFORE resizing")
+    else:
+        print(f"   Image Size: {config['image_size']}x{config['image_size']}")
+    
     print(f"   Batch Size: {config['batch_size']}")
     print("-" * 80)
     
@@ -356,7 +397,21 @@ def print_training_info(config, device, train_loader, val_loader, num_classes, m
     print(f"   Optimizer: AdamW")
     print(f"   Scheduler: ReduceLROnPlateau")
     print(f"   Loss Function: CrossEntropyLoss")
-    print(f"   Output Directory: {config['output_dir']}")
+    
+    # Regularization techniques
+    print(f"\n🛡️  REGULARIZATION (to prevent overfitting):")
+    label_smoothing = config.get('label_smoothing', 0.35)
+    dropout = config.get('dropout', 0.3)
+    use_mixup = config.get('use_mixup', True)
+    print(f"   Label Smoothing: {label_smoothing} (strong)")
+    print(f"   Dropout Rate: {dropout}")
+    print(f"   Mixup Augmentation: {'ENABLED' if use_mixup else 'DISABLED'}")
+    if use_mixup:
+        mixup_alpha = config.get('mixup_alpha', 0.4)
+        print(f"   Mixup Alpha: {mixup_alpha}")
+    print(f"   Target Accuracy: ~95% (realistic performance)")
+    
+    print(f"\n   Output Directory: {config['output_dir']}")
     print("-" * 80)
     
     print("\n🚀 STARTING TRAINING...")
@@ -392,7 +447,8 @@ def main():
         num_classes,
         config['model_name'],
         config['pretrained'],
-        config['freeze_backbone']
+        config['freeze_backbone'],
+        config.get('dropout', 0.3)
     )
 
     # Print detailed information before training

@@ -14,7 +14,7 @@ class VisionTransformerClassifier(nn.Module):
     Uses a pretrained ViT backbone with a custom classification head.
     """
     
-    def __init__(self, num_classes, model_name='vit_base_patch16_224', pretrained=True):
+    def __init__(self, num_classes, model_name='vit_base_patch16_224', pretrained=True, dropout=0.3):
         """
         Initialize the Vision Transformer model
         
@@ -22,18 +22,20 @@ class VisionTransformerClassifier(nn.Module):
             num_classes (int): Number of output classes
             model_name (str): Name of the ViT model from timm library
             pretrained (bool): Whether to use pretrained weights
+            dropout (float): Dropout rate for regularization
         """
         super(VisionTransformerClassifier, self).__init__()
         
         self.num_classes = num_classes
         self.model_name = model_name
         
-        # Load pretrained ViT model from timm
+        # Load pretrained ViT model from timm with dropout
         # timm provides various ViT variants optimized for different use cases
         self.vit = timm.create_model(
             model_name,
             pretrained=pretrained,
-            num_classes=num_classes
+            num_classes=num_classes,
+            drop_rate=dropout  # Add dropout for regularization
         )
         
         print(f"\n{'='*60}")
@@ -42,6 +44,7 @@ class VisionTransformerClassifier(nn.Module):
         print(f"Model: {model_name}")
         print(f"Pretrained: {pretrained}")
         print(f"Number of classes: {num_classes}")
+        print(f"Dropout rate: {dropout}")
         print(f"Input size: 224x224x3")
         print(f"{'='*60}\n")
     
@@ -97,7 +100,7 @@ class VisionTransformerClassifier(nn.Module):
         return trainable_params, total_params
 
 
-def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True, freeze_backbone=False):
+def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True, freeze_backbone=False, dropout=0.3):
     """
     Create and configure a Vision Transformer model
     
@@ -106,6 +109,7 @@ def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True
         model_name (str): Name of the ViT model variant
         pretrained (bool): Whether to use pretrained weights
         freeze_backbone (bool): Whether to freeze the backbone initially
+        dropout (float): Dropout rate for regularization
         
     Returns:
         VisionTransformerClassifier: Configured model
@@ -113,7 +117,8 @@ def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True
     model = VisionTransformerClassifier(
         num_classes=num_classes,
         model_name=model_name,
-        pretrained=pretrained
+        pretrained=pretrained,
+        dropout=dropout
     )
     
     if freeze_backbone:
@@ -128,7 +133,7 @@ def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True
     return model
 
 
-def load_model(checkpoint_path, num_classes, model_name='vit_base_patch16_224', device='cuda'):
+def load_model(checkpoint_path, num_classes, model_name='vit_base_patch16_224', device='cuda', dropout=0.3):
     """
     Load a trained model from checkpoint
     
@@ -137,6 +142,7 @@ def load_model(checkpoint_path, num_classes, model_name='vit_base_patch16_224', 
         num_classes (int): Number of output classes
         model_name (str): Name of the ViT model variant
         device (str): Device to load the model on
+        dropout (float): Dropout rate for regularization
         
     Returns:
         VisionTransformerClassifier: Loaded model
@@ -145,7 +151,8 @@ def load_model(checkpoint_path, num_classes, model_name='vit_base_patch16_224', 
     model = VisionTransformerClassifier(
         num_classes=num_classes,
         model_name=model_name,
-        pretrained=False  # Don't load pretrained weights when loading from checkpoint
+        pretrained=False,  # Don't load pretrained weights when loading from checkpoint
+        dropout=dropout
     )
     
     # Load checkpoint

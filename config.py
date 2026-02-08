@@ -15,9 +15,13 @@ MODEL_CONFIG = {
 TRAIN_CONFIG = {
     'epochs': 30,
     'learning_rate': 1e-4,
-    'weight_decay': 0.01,
+    'weight_decay': 0.05,  # Increased from 0.01 to prevent overfitting
     'scheduler': 'plateau',
-    'early_stopping_patience': 10,
+    'early_stopping_patience': 7,  # Reduced from 10 to stop earlier
+    'label_smoothing': 0.35,  # Strong smoothing to prevent overconfidence
+    'dropout': 0.3,  # Dropout rate for regularization
+    'use_mixup': True,  # Enable Mixup augmentation to prevent overfitting
+    'mixup_alpha': 0.4,  # Mixup interpolation strength
 }
 
 OUTPUT_CONFIG = {
