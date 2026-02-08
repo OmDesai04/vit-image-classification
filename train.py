@@ -22,6 +22,7 @@ from sklearn.metrics import (
 
 from dataset_loader import create_dataloaders
 from model import create_model
+from config import DATA_CONFIG, MODEL_CONFIG, TRAIN_CONFIG, OUTPUT_CONFIG
 
 
 class Trainer:
@@ -405,18 +406,12 @@ def print_training_info(config, device, train_loader, val_loader, num_classes, m
 
 
 def main():
+    # Merge all config sections into one
     config = {
-        'data_root': "/content/drive/MyDrive/split_dataset",
-        'batch_size': 32,
-        'num_workers': 2,
-        'image_size': 224,
-        'epochs': 30,
-        'learning_rate': 5e-5,
-        'weight_decay': 0.1,
-        'model_name': 'vit_base_patch16_224',  # ViT-Base (86.57M params) - Pure ViT with patch16
-        'pretrained': True,  # Use pretrained ImageNet weights
-        'freeze_backbone': False,
-        'output_dir': "/content/drive/MyDrive/outputs"
+        **DATA_CONFIG,
+        **MODEL_CONFIG,
+        **TRAIN_CONFIG,
+        **OUTPUT_CONFIG
     }
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
