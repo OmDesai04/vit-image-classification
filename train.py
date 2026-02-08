@@ -413,6 +413,13 @@ def main():
         **TRAIN_CONFIG,
         **OUTPUT_CONFIG
     }
+    
+    # ========================================================================
+    # CHANGE YOUR PATHS HERE:
+    # ========================================================================
+    config['data_root'] = 'split_dataset'  # Change to your dataset path
+    config['output_dir'] = 'outputs'       # Change to your output path
+    # ========================================================================
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
