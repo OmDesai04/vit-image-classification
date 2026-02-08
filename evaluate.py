@@ -249,7 +249,8 @@ def main():
         data_root=config['data_root'],
         batch_size=config['batch_size'],
         num_workers=config['num_workers'],
-        image_size=config['image_size']
+        image_size=config['image_size'],
+        crop_size=config.get('crop_size', None)
     )
     
     print("\nLoading trained model...")

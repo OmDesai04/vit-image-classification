@@ -147,7 +147,8 @@ def test_dataset_loading():
             data_root='split_dataset',
             batch_size=4,
             num_workers=0,
-            image_size=224
+            image_size=224,
+            crop_size=256
         )
         
         print(f"\n✓ Dataset loading successful!")

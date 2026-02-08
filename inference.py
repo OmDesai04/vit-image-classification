@@ -13,11 +13,12 @@ from model import load_model
 
 class ImageClassifier:
     
-    def __init__(self, model_path, class_names, model_name='vit_tiny_patch16_224', device='cuda', image_size=224):
+    def __init__(self, model_path, class_names, model_name='vit_tiny_patch16_224', device='cuda', image_size=224, crop_size=None):
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         self.class_names = class_names
         self.num_classes = len(class_names)
         self.image_size = image_size
+        self.crop_size = crop_size
         
         print(f"Loading model from {model_path}...")
         self.model = load_model(
@@ -28,12 +29,20 @@ class ImageClassifier:
         )
         self.model.eval()
         
-        self.transform = transforms.Compose([
+        # Build transform with optional cropping
+        transform_list = []
+        if crop_size is not None and crop_size > 0:
+            transform_list.append(transforms.CenterCrop(crop_size))
+            print(f"Center cropping enabled: {crop_size}x{crop_size}")
+        
+        transform_list.extend([
             transforms.Resize((image_size, image_size)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225])
         ])
+        
+        self.transform = transforms.Compose(transform_list)
         
         print(f"Classifier ready on {self.device}")
     
@@ -127,14 +136,15 @@ class ImageClassifier:
         return result
 
 
-def predict_single_image(model_path, image_path, class_names_path, model_name='vit_tiny_patch16_224'):
+def predict_single_image(model_path, image_path, class_names_path, model_name='vit_tiny_patch16_224', crop_size=None):
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
     
     classifier = ImageClassifier(
         model_path=model_path,
         class_names=class_names,
-        model_name=model_name
+        model_name=model_name,
+        crop_size=crop_size
     )
     
     result = classifier.predict(image_path, return_probabilities=True)
@@ -154,7 +164,7 @@ def predict_single_image(model_path, image_path, class_names_path, model_name='v
     return result
 
 
-def predict_from_directory(model_path, image_dir, class_names_path, output_csv, model_name='vit_tiny_patch16_224'):
+def predict_from_directory(model_path, image_dir, class_names_path, output_csv, model_name='vit_tiny_patch16_224', crop_size=None):
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
     
@@ -171,7 +181,8 @@ def predict_from_directory(model_path, image_dir, class_names_path, output_csv, 
     classifier = ImageClassifier(
         model_path=model_path,
         class_names=class_names,
-        model_name=model_name
+        model_name=model_name,
+        crop_size=crop_size
     )
     
     results = classifier.predict_batch(image_paths, output_csv=output_csv)
@@ -186,14 +197,15 @@ def predict_from_directory(model_path, image_dir, class_names_path, output_csv, 
     return results
 
 
-def create_prediction_table(test_dir, model_path, class_names_path, output_csv, model_name='vit_tiny_patch16_224'):
+def create_prediction_table(test_dir, model_path, class_names_path, output_csv, model_name='vit_tiny_patch16_224', crop_size=None):
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
     
     classifier = ImageClassifier(
         model_path=model_path,
         class_names=class_names,
-        model_name=model_name
+        model_name=model_name,
+        crop_size=crop_size
     )
     
     test_dir = Path(test_dir)
@@ -277,8 +289,13 @@ def main():
                        help='Path to class names JSON file')
     parser.add_argument('--model-name', type=str, default='vit_base_patch32_224',
                        help='ViT model variant name')
+    parser.add_argument('--crop-size', type=int, default=256,
+                       help='Size to crop images before resizing (None or 0 to disable cropping)')
     
     args = parser.parse_args()
+    
+    # Convert crop_size to None if 0
+    crop_size = args.crop_size if args.crop_size > 0 else None
     
     if not Path(args.model).exists():
         print(f"Error: Model file not found at {args.model}")
@@ -299,7 +316,8 @@ def main():
             model_path=args.model,
             image_path=args.image,
             class_names_path=args.class_names,
-            model_name=args.model_name
+            model_name=args.model_name,
+            crop_size=crop_size
         )
     
     elif args.mode == 'directory':
@@ -312,7 +330,8 @@ def main():
             image_dir=args.dir,
             class_names_path=args.class_names,
             output_csv=args.output,
-            model_name=args.model_name
+            model_name=args.model_name,
+            crop_size=crop_size
         )
     
     elif args.mode == 'table':
@@ -321,7 +340,8 @@ def main():
             model_path=args.model,
             class_names_path=args.class_names,
             output_csv=args.output,
-            model_name=args.model_name
+            model_name=args.model_name,
+            crop_size=crop_size
         )
 
 

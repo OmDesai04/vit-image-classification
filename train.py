@@ -384,7 +384,8 @@ def main():
         config['data_root'],
         config['batch_size'],
         config['num_workers'],
-        config['image_size']
+        config['image_size'],
+        config.get('crop_size', None)
     )
 
     model = create_model(

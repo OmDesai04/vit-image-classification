@@ -3,6 +3,7 @@ DATA_CONFIG = {
     'image_size': 224,
     'batch_size': 32,
     'num_workers': 4,
+    'crop_size': 256,  # Crop to this size before resizing to image_size (set to None to disable cropping)
 }
 
 MODEL_CONFIG = {

@@ -75,9 +75,24 @@ class ImageClassificationDataset(Dataset):
         return distribution
 
 
-def get_transforms(image_size=224, is_training=True):
+def get_transforms(image_size=224, is_training=True, crop_size=None):
+    """
+    Get image transforms with optional center cropping.
+    
+    Args:
+        image_size: Final image size for the model
+        is_training: Whether to apply training augmentations
+        crop_size: Size to crop the image to before resizing (None = no cropping)
+    """
     if is_training:
-        transform = transforms.Compose([
+        transform_list = []
+        
+        # Add center crop if specified
+        if crop_size is not None and crop_size > 0:
+            transform_list.append(transforms.CenterCrop(crop_size))
+        
+        # Resize and augmentations
+        transform_list.extend([
             transforms.Resize((image_size, image_size)),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomVerticalFlip(p=0.2),
@@ -91,13 +106,24 @@ def get_transforms(image_size=224, is_training=True):
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225])
         ])
+        
+        transform = transforms.Compose(transform_list)
     else:
-        transform = transforms.Compose([
+        transform_list = []
+        
+        # Add center crop if specified
+        if crop_size is not None and crop_size > 0:
+            transform_list.append(transforms.CenterCrop(crop_size))
+        
+        # Resize and normalization
+        transform_list.extend([
             transforms.Resize((image_size, image_size)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225])
         ])
+        
+        transform = transforms.Compose(transform_list)
     
     return transform
 
@@ -105,7 +131,8 @@ def get_transforms(image_size=224, is_training=True):
 def create_dataloaders(data_root='split_dataset', 
                       batch_size=32, 
                       num_workers=4,
-                      image_size=224):
+                      image_size=224,
+                      crop_size=None):
     data_root = Path(data_root)
     
     train_dir = data_root / 'train'
@@ -116,8 +143,8 @@ def create_dataloaders(data_root='split_dataset',
         if not dir_path.exists():
             raise ValueError(f"{name} directory not found at {dir_path}")
     
-    train_transform = get_transforms(image_size=image_size, is_training=True)
-    val_transform = get_transforms(image_size=image_size, is_training=False)
+    train_transform = get_transforms(image_size=image_size, is_training=True, crop_size=crop_size)
+    val_transform = get_transforms(image_size=image_size, is_training=False, crop_size=crop_size)
     
     train_dataset = ImageClassificationDataset(
         train_dir, 
@@ -150,6 +177,8 @@ def create_dataloaders(data_root='split_dataset',
     print(f"Training samples: {len(train_dataset)}")
     print(f"Validation samples: {len(val_dataset)}")
     print(f"Test samples: {len(test_dataset)}")
+    if crop_size is not None and crop_size > 0:
+        print(f"Image cropping: {crop_size}x{crop_size} (center crop)")
     print(f"Image size: {image_size}x{image_size}")
     print(f"Batch size: {batch_size}")
     print("="*60 + "\n")
@@ -186,7 +215,8 @@ if __name__ == "__main__":
         data_root='split_dataset',
         batch_size=16,
         num_workers=0,
-        image_size=224
+        image_size=224,
+        crop_size=256
     )
     
     print("\nTesting data loading...")
