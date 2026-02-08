@@ -397,21 +397,7 @@ def print_training_info(config, device, train_loader, val_loader, num_classes, m
     print(f"   Optimizer: AdamW")
     print(f"   Scheduler: ReduceLROnPlateau")
     print(f"   Loss Function: CrossEntropyLoss")
-    
-    # Regularization techniques
-    print(f"\n🛡️  REGULARIZATION (to prevent overfitting):")
-    label_smoothing = config.get('label_smoothing', 0.35)
-    dropout = config.get('dropout', 0.3)
-    use_mixup = config.get('use_mixup', True)
-    print(f"   Label Smoothing: {label_smoothing} (strong)")
-    print(f"   Dropout Rate: {dropout}")
-    print(f"   Mixup Augmentation: {'ENABLED' if use_mixup else 'DISABLED'}")
-    if use_mixup:
-        mixup_alpha = config.get('mixup_alpha', 0.4)
-        print(f"   Mixup Alpha: {mixup_alpha}")
-    print(f"   Target Accuracy: ~95% (realistic performance)")
-    
-    print(f"\n   Output Directory: {config['output_dir']}")
+    print(f"   Output Directory: {config['output_dir']}")
     print("-" * 80)
     
     print("\n🚀 STARTING TRAINING...")
