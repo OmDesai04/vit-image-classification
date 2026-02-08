@@ -177,7 +177,7 @@ def test_model_creation():
         print("Attempting to create model...")
         model = create_model(
             num_classes=65,
-            model_name='vit_base_patch32_224',
+            model_name='vit_base_patch16_224',
             pretrained=False,
             freeze_backbone=False
         )

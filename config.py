@@ -7,7 +7,7 @@ DATA_CONFIG = {
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_base_patch32_224',  # ViT-Base (87.51M params) - Pure ViT with patch32
+    'model_name': 'vit_base_patch16_224',  # ViT-Base (86.57M params) - Pure ViT with patch16 (better performance)
     'pretrained': True,  # Use pretrained weights
     'freeze_backbone': False,
 }
