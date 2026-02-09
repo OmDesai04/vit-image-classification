@@ -14,7 +14,7 @@ class VisionTransformerClassifier(nn.Module):
     Uses a pretrained ViT backbone with a custom classification head.
     """
     
-    def __init__(self, num_classes, model_name='vit_base_patch32_224', pretrained=True, dropout=0.2):
+    def __init__(self, num_classes, model_name='vit_base_patch32_224', pretrained=True, dropout=0.5):
         """
         Initialize the Vision Transformer model
         
@@ -22,7 +22,7 @@ class VisionTransformerClassifier(nn.Module):
             num_classes (int): Number of output classes
             model_name (str): Name of the ViT model from timm library (default: vit_base_patch32_224)
             pretrained (bool): Whether to use pretrained weights
-            dropout (float): Dropout rate for regularization
+            dropout (float): Dropout rate for regularization (default: 0.5 for strong regularization)
         """
         super(VisionTransformerClassifier, self).__init__()
         
@@ -100,7 +100,7 @@ class VisionTransformerClassifier(nn.Module):
         return trainable_params, total_params
 
 
-def create_model(num_classes, model_name='vit_base_patch32_224', pretrained=True, freeze_backbone=False, dropout=0.2):
+def create_model(num_classes, model_name='vit_base_patch32_224', pretrained=True, freeze_backbone=False, dropout=0.5):
     """
     Create and configure a Vision Transformer model
     
@@ -109,7 +109,7 @@ def create_model(num_classes, model_name='vit_base_patch32_224', pretrained=True
         model_name (str): Name of the ViT model variant
         pretrained (bool): Whether to use pretrained weights
         freeze_backbone (bool): Whether to freeze the backbone initially
-        dropout (float): Dropout rate for regularization
+        dropout (float): Dropout rate for regularization (default: 0.5)
         
     Returns:
         VisionTransformerClassifier: Configured model
@@ -133,7 +133,7 @@ def create_model(num_classes, model_name='vit_base_patch32_224', pretrained=True
     return model
 
 
-def load_model(checkpoint_path, num_classes, model_name='vit_base_patch32_224', device='cuda', dropout=0.2):
+def load_model(checkpoint_path, num_classes, model_name='vit_base_patch32_224', device='cuda', dropout=0.5):
     """
     Load a trained model from checkpoint
     
@@ -142,7 +142,7 @@ def load_model(checkpoint_path, num_classes, model_name='vit_base_patch32_224', 
         num_classes (int): Number of output classes
         model_name (str): Name of the ViT model variant
         device (str): Device to load the model on
-        dropout (float): Dropout rate for regularization
+        dropout (float): Dropout rate for regularization (default: 0.5)
         
     Returns:
         VisionTransformerClassifier: Loaded model

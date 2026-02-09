@@ -2,7 +2,7 @@ DATA_CONFIG = {
     'data_root': 'split_dataset',
     'image_size': 224,
     'batch_size': 32,
-    'num_workers': 4,
+    'num_workers': 2,  # Reduced from 4 to 2 to match system recommendation
     'crop_size': None,  # Disabled cropping for vit_base_patch32_224
 }
 
@@ -13,15 +13,15 @@ MODEL_CONFIG = {
 }
 
 TRAIN_CONFIG = {
-    'epochs': 35,
-    'learning_rate': 2e-4,  # Slightly higher LR for vit_base_patch32
-    'weight_decay': 0.03,  # Moderate weight decay for ~90% accuracy
+    'epochs': 30,
+    'learning_rate': 1.5e-4,  # Slightly reduced LR
+    'weight_decay': 0.1,  # Strong weight decay to prevent overfitting
     'scheduler': 'plateau',
     'early_stopping_patience': 8,
-    'label_smoothing': 0.1,  # Reduced smoothing for better accuracy
-    'dropout': 0.2,  # Lighter dropout for vit_base_patch32
+    'label_smoothing': 0.4,  # Strong smoothing to reduce accuracy below 95%
+    'dropout': 0.5,  # Heavy dropout for regularization
     'use_mixup': True,  # Enable Mixup augmentation
-    'mixup_alpha': 0.2,  # Lighter mixup for better accuracy
+    'mixup_alpha': 0.6,  # Strong mixup to prevent overfitting
 }
 
 OUTPUT_CONFIG = {

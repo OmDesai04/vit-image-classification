@@ -105,8 +105,8 @@ class Trainer:
 
             self.optimizer.zero_grad()
             
-            # Apply mixup augmentation for regularization
-            if self.use_mixup and np.random.rand() > 0.5:  # 50% chance to apply mixup for better accuracy
+            # Apply mixup augmentation for strong regularization
+            if self.use_mixup and np.random.rand() > 0.2:  # 80% chance to apply mixup for regularization
                 images, labels_a, labels_b, lam = self.mixup_data(images, labels, self.mixup_alpha)
                 outputs = self.model(images)
                 loss = self.mixup_criterion(outputs, labels_a, labels_b, lam)
