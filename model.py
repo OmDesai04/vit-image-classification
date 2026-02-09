@@ -14,13 +14,13 @@ class VisionTransformerClassifier(nn.Module):
     Uses a pretrained ViT backbone with a custom classification head.
     """
     
-    def __init__(self, num_classes, model_name='vit_base_patch16_224', pretrained=True, dropout=0.3):
+    def __init__(self, num_classes, model_name='vit_base_patch32_224', pretrained=True, dropout=0.2):
         """
         Initialize the Vision Transformer model
         
         Args:
             num_classes (int): Number of output classes
-            model_name (str): Name of the ViT model from timm library
+            model_name (str): Name of the ViT model from timm library (default: vit_base_patch32_224)
             pretrained (bool): Whether to use pretrained weights
             dropout (float): Dropout rate for regularization
         """
@@ -100,7 +100,7 @@ class VisionTransformerClassifier(nn.Module):
         return trainable_params, total_params
 
 
-def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True, freeze_backbone=False, dropout=0.3):
+def create_model(num_classes, model_name='vit_base_patch32_224', pretrained=True, freeze_backbone=False, dropout=0.2):
     """
     Create and configure a Vision Transformer model
     
@@ -133,7 +133,7 @@ def create_model(num_classes, model_name='vit_base_patch16_224', pretrained=True
     return model
 
 
-def load_model(checkpoint_path, num_classes, model_name='vit_base_patch16_224', device='cuda', dropout=0.3):
+def load_model(checkpoint_path, num_classes, model_name='vit_base_patch32_224', device='cuda', dropout=0.2):
     """
     Load a trained model from checkpoint
     

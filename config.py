@@ -3,25 +3,25 @@ DATA_CONFIG = {
     'image_size': 224,
     'batch_size': 32,
     'num_workers': 4,
-    'crop_size': 256,  # Crop to this size before resizing to image_size (set to None to disable cropping)
+    'crop_size': None,  # Disabled cropping for vit_base_patch32_224
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_base_patch16_224',  # ViT-Base (86.57M params) - Pure ViT with patch16 (better performance)
+    'model_name': 'vit_base_patch32_224',  # ViT-Base with patch32 (88M params) - Faster training without cropping
     'pretrained': True,  # Use pretrained weights
     'freeze_backbone': False,
 }
 
 TRAIN_CONFIG = {
-    'epochs': 30,
-    'learning_rate': 1e-4,
-    'weight_decay': 0.05,  # Increased from 0.01 to prevent overfitting
+    'epochs': 35,
+    'learning_rate': 2e-4,  # Slightly higher LR for vit_base_patch32
+    'weight_decay': 0.03,  # Moderate weight decay for ~90% accuracy
     'scheduler': 'plateau',
-    'early_stopping_patience': 7,  # Reduced from 10 to stop earlier
-    'label_smoothing': 0.35,  # Strong smoothing to prevent overconfidence
-    'dropout': 0.3,  # Dropout rate for regularization
-    'use_mixup': True,  # Enable Mixup augmentation to prevent overfitting
-    'mixup_alpha': 0.4,  # Mixup interpolation strength
+    'early_stopping_patience': 8,
+    'label_smoothing': 0.1,  # Reduced smoothing for better accuracy
+    'dropout': 0.2,  # Lighter dropout for vit_base_patch32
+    'use_mixup': True,  # Enable Mixup augmentation
+    'mixup_alpha': 0.2,  # Lighter mixup for better accuracy
 }
 
 OUTPUT_CONFIG = {
