@@ -3,7 +3,7 @@ DATA_CONFIG = {
     'image_size': 224,
     'batch_size': 32,
     'num_workers': 2,
-    'crop_size': 180,  # Random corner/edge cropping during training (4 corners + center)
+    'crop_size': 150,  # AGGRESSIVE corner cropping - removes 33% from all edges!
 }
 
 MODEL_CONFIG = {
@@ -14,14 +14,14 @@ MODEL_CONFIG = {
 
 TRAIN_CONFIG = {
     'epochs': 30,
-    'learning_rate': 1e-4,  # Lower LR for tiny model
-    'weight_decay': 0.15,  # Very strong weight decay
+    'learning_rate': 5e-5,  # Even lower LR
+    'weight_decay': 0.2,  # Maximum weight decay
     'scheduler': 'plateau',
-    'early_stopping_patience': 8,
-    'label_smoothing': 0.5,  # Very strong label smoothing (50%)
-    'dropout': 0.6,  # Very heavy dropout (60%)
+    'early_stopping_patience': 10,
+    'label_smoothing': 0.6,  # EXTREME label smoothing (60%)
+    'dropout': 0.7,  # EXTREME dropout (70%)
     'use_mixup': True,
-    'mixup_alpha': 0.8,  # Very strong mixup
+    'mixup_alpha': 1.0,  # Maximum mixup
 }
 
 OUTPUT_CONFIG = {

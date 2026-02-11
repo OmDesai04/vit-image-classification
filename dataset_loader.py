@@ -5,6 +5,7 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+import random
 
 
 class ImageClassificationDataset(Dataset):
@@ -77,32 +78,32 @@ class ImageClassificationDataset(Dataset):
 
 def get_transforms(image_size=224, is_training=True, crop_size=None):
     """
-    Get image transforms with optional center cropping.
+    Get image transforms with aggressive random corner cropping.
     
     Args:
         image_size: Final image size for the model
         is_training: Whether to apply training augmentations
-        crop_size: Size to crop the image to before resizing (None = no cropping)
+        crop_size: Size to crop from corners (removes edge information)
     """
     if is_training:
         transform_list = []
         
-        # Add center crop if specified
+        # Add AGGRESSIVE random corner crop (removes all 4 edges)
         if crop_size is not None and crop_size > 0:
-            transform_list.append(transforms.CenterCrop(crop_size))
+            transform_list.append(RandomCornerCrop(crop_size))
         
         # Resize and augmentations
         transform_list.extend([
             transforms.Resize((image_size, image_size)),
             transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.2),
-            transforms.RandomRotation(degrees=30),
-            transforms.RandomAffine(degrees=0, translate=(0.15, 0.15), scale=(0.85, 1.15)),
-            transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.3, hue=0.15),
-            transforms.RandomGrayscale(p=0.15),
-            transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
+            transforms.RandomVerticalFlip(p=0.3),  # Increased
+            transforms.RandomRotation(degrees=45),  # More aggressive rotation
+            transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), scale=(0.8, 1.2)),  # More aggressive
+            transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.4, hue=0.2),  # Stronger
+            transforms.RandomGrayscale(p=0.2),  # Increased
+            transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 3.0)),  # Stronger blur
             transforms.ToTensor(),
-            transforms.RandomErasing(p=0.3, scale=(0.02, 0.25)),
+            transforms.RandomErasing(p=0.4, scale=(0.02, 0.3)),  # More aggressive erasing
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225])
         ])
@@ -179,8 +180,9 @@ def create_dataloaders(data_root='split_dataset',
     print(f"Test samples: {len(test_dataset)}")
     if crop_size is not None and crop_size > 0:
         print(f"Image cropping: {crop_size}x{crop_size}")
-        print(f"  - Training: Random corner/edge crops (4 corners + center)")
+        print(f"  - Training: AGGRESSIVE random corner crops (4 corners ONLY, no center)")
         print(f"  - Validation/Test: Center crop only")
+        print(f"  - Edge loss: ~{int((1 - crop_size/224) * 100)}% of image removed from edges")
     print(f"Image size: {image_size}x{image_size}")
     print(f"Batch size: {batch_size}")
     print("="*60 + "\n")
