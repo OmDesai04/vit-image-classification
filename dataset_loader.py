@@ -178,7 +178,9 @@ def create_dataloaders(data_root='split_dataset',
     print(f"Validation samples: {len(val_dataset)}")
     print(f"Test samples: {len(test_dataset)}")
     if crop_size is not None and crop_size > 0:
-        print(f"Image cropping: {crop_size}x{crop_size} (center crop)")
+        print(f"Image cropping: {crop_size}x{crop_size}")
+        print(f"  - Training: Random corner/edge crops (4 corners + center)")
+        print(f"  - Validation/Test: Center crop only")
     print(f"Image size: {image_size}x{image_size}")
     print(f"Batch size: {batch_size}")
     print("="*60 + "\n")
