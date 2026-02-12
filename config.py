@@ -3,23 +3,23 @@ DATA_CONFIG = {
     'image_size': 224,
     'batch_size': 32,
     'num_workers': 2,
-    'crop_size': 150,  # AGGRESSIVE corner cropping - removes 33% from all edges!
+    'crop_size': None,  # NO cropping - using full images with patch32
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_tiny_patch16_224',  # ViT-Tiny (5.7M params) - 15x smaller to prevent overfitting
+    'model_name': 'vit_base_patch32_224',  # ViT-Base Patch32 (88M params) - Larger patches = less details
     'pretrained': True,
     'freeze_backbone': False,
 }
 
 TRAIN_CONFIG = {
     'epochs': 30,
-    'learning_rate': 5e-5,  # Even lower LR
-    'weight_decay': 0.2,  # Maximum weight decay
+    'learning_rate': 3e-5,  # Very low LR for base model
+    'weight_decay': 0.3,  # Very high weight decay
     'scheduler': 'plateau',
     'early_stopping_patience': 10,
-    'label_smoothing': 0.6,  # EXTREME label smoothing (60%)
-    'dropout': 0.7,  # EXTREME dropout (70%)
+    'label_smoothing': 0.7,  # EXTREME label smoothing (70%)
+    'dropout': 0.8,  # MAXIMUM dropout (80%)
     'use_mixup': True,
     'mixup_alpha': 1.0,  # Maximum mixup
 }

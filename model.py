@@ -38,10 +38,21 @@ class VisionTransformerClassifier(nn.Module):
             drop_rate=dropout  # Add dropout for regularization
         )
         
+        # Extract patch size from model name
+        patch_size = 16  # default
+        if 'patch32' in model_name:
+            patch_size = 32
+        elif 'patch16' in model_name:
+            patch_size = 16
+        
+        num_patches = (224 // patch_size) ** 2
+        
         print(f"\n{'='*60}")
         print(f"MODEL CONFIGURATION")
         print(f"{'='*60}")
         print(f"Model: {model_name}")
+        print(f"Patch Size: {patch_size}x{patch_size} ({'Larger patches = Less details' if patch_size == 32 else 'Smaller patches = More details'})")
+        print(f"Number of Patches: {num_patches} ({224//patch_size}x{224//patch_size} grid)")
         print(f"Pretrained: {pretrained}")
         print(f"Number of classes: {num_classes}")
         print(f"Dropout rate: {dropout}")

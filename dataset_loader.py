@@ -8,6 +8,33 @@ from torchvision import transforms
 import random
 
 
+class RandomCornerCrop:
+    """
+    Aggressively crop from random corners (all 4 corners, NOT center).
+    This removes edge information and forces model to learn from partial views.
+    """
+    def __init__(self, crop_size):
+        self.crop_size = crop_size
+        
+    def __call__(self, img):
+        w, h = img.size
+        crop_size = min(self.crop_size, w, h)
+        
+        # Only 4 corners - NO center crop to make it harder
+        position = random.choice(['top_left', 'top_right', 'bottom_left', 'bottom_right'])
+        
+        if position == 'top_left':
+            left, top = 0, 0
+        elif position == 'top_right':
+            left, top = w - crop_size, 0
+        elif position == 'bottom_left':
+            left, top = 0, h - crop_size
+        else:  # bottom_right
+            left, top = w - crop_size, h - crop_size
+        
+        return img.crop((left, top, left + crop_size, top + crop_size))
+
+
 class ImageClassificationDataset(Dataset):
     
     def __init__(self, root_dir, transform=None, exclude_folders=None):

@@ -238,9 +238,16 @@ class GradCAMVisualizer:
 
 
 def main():
+    # ========================================================================
+    # CONFIGURE YOUR IMAGE DIRECTORY HERE (or use command line arguments)
+    # ========================================================================
+    DEFAULT_IMAGE_DIR = None  # Set to your image directory path, e.g., 'C:/Users/YourName/Images'
+    DEFAULT_IMAGE = None      # Set to your single image path, e.g., 'C:/Users/YourName/test.jpg'
+    # ========================================================================
+    
     parser = argparse.ArgumentParser(description='Grad-CAM Visualization for ViT')
-    parser.add_argument('--image', type=str, help='Path to single input image')
-    parser.add_argument('--image-dir', type=str, help='Directory of images to process')
+    parser.add_argument('--image', type=str, default=DEFAULT_IMAGE, help='Path to single input image')
+    parser.add_argument('--image-dir', type=str, default=DEFAULT_IMAGE_DIR, help='Directory of images to process')
     parser.add_argument('--output', type=str, default='gradcam_output.png',
                        help='Output path for visualization')
     parser.add_argument('--output-dir', type=str, default='gradcam_outputs',

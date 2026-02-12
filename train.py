@@ -423,13 +423,21 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    train_loader, val_loader, _, num_classes, _ = create_dataloaders(
+    train_loader, val_loader, _, num_classes, class_names = create_dataloaders(
         config['data_root'],
         config['batch_size'],
         config['num_workers'],
         config['image_size'],
         config.get('crop_size', None)
     )
+    
+    # Save class names to JSON file for inference
+    import json
+    output_dir = Path(config['output_dir'])
+    output_dir.mkdir(parents=True, exist_ok=True)
+    with open(output_dir / 'class_names.json', 'w') as f:
+        json.dump(class_names, f, indent=2)
+    print(f"✓ Saved class names to {output_dir / 'class_names.json'}")
 
     model = create_model(
         num_classes,
