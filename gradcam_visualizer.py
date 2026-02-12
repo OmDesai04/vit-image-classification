@@ -239,10 +239,12 @@ class GradCAMVisualizer:
 
 def main():
     # ========================================================================
-    # CONFIGURE YOUR IMAGE DIRECTORY HERE (or use command line arguments)
+    # CONFIGURE YOUR PATHS HERE (or use command line arguments)
     # ========================================================================
-    DEFAULT_IMAGE_DIR = None  # Set to your image directory path, e.g., 'C:/Users/YourName/Images'
-    DEFAULT_IMAGE = None      # Set to your single image path, e.g., 'C:/Users/YourName/test.jpg'
+    DEFAULT_MODEL_PATH = None        # Set to your .pth file path, e.g., 'C:/path/to/best_model.pth'
+    DEFAULT_CLASS_NAMES_PATH = None  # Set to your class_names.json path, e.g., 'C:/path/to/class_names.json'
+    DEFAULT_IMAGE_DIR = None         # Set to your image directory path, e.g., 'C:/Users/YourName/Images'
+    DEFAULT_IMAGE = None             # Set to your single image path, e.g., 'C:/Users/YourName/test.jpg'
     # ========================================================================
     
     parser = argparse.ArgumentParser(description='Grad-CAM Visualization for ViT')
@@ -252,9 +254,11 @@ def main():
                        help='Output path for visualization')
     parser.add_argument('--output-dir', type=str, default='gradcam_outputs',
                        help='Output directory for batch processing')
-    parser.add_argument('--model', type=str, default=INFERENCE_CONFIG['model_path'],
-                       help='Path to model checkpoint')
-    parser.add_argument('--classes', type=str, default=INFERENCE_CONFIG['class_names_path'],
+    parser.add_argument('--model', type=str, 
+                       default=DEFAULT_MODEL_PATH if DEFAULT_MODEL_PATH else INFERENCE_CONFIG['model_path'],
+                       help='Path to model checkpoint (.pth file)')
+    parser.add_argument('--classes', type=str, 
+                       default=DEFAULT_CLASS_NAMES_PATH if DEFAULT_CLASS_NAMES_PATH else INFERENCE_CONFIG['class_names_path'],
                        help='Path to class names JSON')
     parser.add_argument('--alpha', type=float, default=0.4,
                        help='Heatmap overlay transparency (0-1)')
