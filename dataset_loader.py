@@ -123,14 +123,16 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
         transform_list.extend([
             transforms.Resize((image_size, image_size)),
             transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.3),  # Increased
-            transforms.RandomRotation(degrees=45),  # More aggressive rotation
-            transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), scale=(0.8, 1.2)),  # More aggressive
-            transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.4, hue=0.2),  # Stronger
-            transforms.RandomGrayscale(p=0.2),  # Increased
-            transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 3.0)),  # Stronger blur
+            transforms.RandomVerticalFlip(p=0.4),  # Increased
+            transforms.RandomRotation(degrees=50),  # Very aggressive
+            transforms.RandomAffine(degrees=0, translate=(0.25, 0.25), scale=(0.75, 1.25)),  # Very aggressive
+            transforms.RandomPerspective(distortion_scale=0.3, p=0.4),  # Add perspective distortion
+            transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.5, hue=0.25),  # Very strong
+            transforms.RandomGrayscale(p=0.25),  # Increased
+            transforms.RandomInvert(p=0.15),  # Add random inversion
+            transforms.GaussianBlur(kernel_size=7, sigma=(0.1, 4.0)),  # Very strong blur
             transforms.ToTensor(),
-            transforms.RandomErasing(p=0.4, scale=(0.02, 0.3)),  # More aggressive erasing
+            transforms.RandomErasing(p=0.5, scale=(0.02, 0.35)),  # Very aggressive erasing
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225])
         ])
