@@ -95,6 +95,10 @@ class ImageClassifier:
         print(f"\nProcessing {len(image_paths)} images...")
         for i, image_path in enumerate(image_paths, 1):
             try:
+                # Ensure image_path is a Path object for consistent handling
+                if not isinstance(image_path, Path):
+                    image_path = Path(image_path)
+                
                 result = self.predict(image_path)
                 results.append(result)
                 
@@ -111,19 +115,32 @@ class ImageClassifier:
                     'error': str(e)
                 })
         
-        if output_csv:
+        if output_csv and len(results) > 0:
             self.save_predictions_to_csv(results, output_csv)
         
         return results
     
     def save_predictions_to_csv(self, results, output_path):
+        if not results:
+            print("No results to save.")
+            return
+        
         data = {
-            'Image Path': [r['image_path'] for r in results],
-            'Predicted Class': [r['predicted_class'] for r in results],
-            'Confidence': [r['confidence'] for r in results]
+            'Image Path': [r.get('image_path', '') for r in results],
+            'Predicted Class': [r.get('predicted_class', 'ERROR') for r in results],
+            'Confidence': [r.get('confidence', 0.0) for r in results]
         }
         
+        # Add error column if any errors exist
+        if any('error' in r for r in results):
+            data['Error'] = [r.get('error', '') for r in results]
+        
         df = pd.DataFrame(data)
+        
+        # Create output directory if it doesn't exist
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
         df.to_csv(output_path, index=False)
         
         print(f"\nPredictions saved to {output_path}")
@@ -249,8 +266,25 @@ def create_prediction_table(test_dir, model_path, class_names_path, output_csv, 
         
         except Exception as e:
             print(f"Error processing {img_path}: {e}")
+            results.append({
+                'Image Name': img_path.name,
+                'Image Path': str(img_path),
+                'True Label': true_label,
+                'Predicted Label': 'ERROR',
+                'Confidence': '0.00%',
+                'Correct': '✗'
+            })
+    
+    if not results:
+        print("\nNo results to save. Exiting.")
+        return
     
     df = pd.DataFrame(results)
+    
+    # Create output directory if it doesn't exist
+    output_csv_path = Path(output_csv)
+    output_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    
     df.to_csv(output_csv, index=False)
     
     accuracy = (correct_predictions / len(results)) * 100 if results else 0
@@ -346,4 +380,71 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # ============================================================================
+    # BATCH PREDICTION CONFIGURATION - EDIT THESE VALUES
+    # ============================================================================
+    RUN_MODE = 'auto'  # 'auto' to use config below, 'cli' to use command line args
+    
+    # Configure your paths here:
+    MODEL_PATH = 'outputs/best_model.pth'
+    CLASS_NAMES_PATH = 'outputs/class_names.json'
+    IMAGE_FOLDER = 'split_dataset/test'  # Change this to your image folder
+    OUTPUT_CSV = 'outputs/predictions.csv'
+    MODEL_NAME = 'vit_base_patch32_224'
+    CROP_SIZE = 0  # Set to 0 to disable cropping, or use value like 256
+    
+    # ============================================================================
+    
+    if RUN_MODE == 'auto':
+        # Run with configured paths
+        print("Running batch prediction with configured paths...")
+        print(f"Model: {MODEL_PATH}")
+        print(f"Images: {IMAGE_FOLDER}")
+        print(f"Output: {OUTPUT_CSV}\n")
+        
+        if not Path(MODEL_PATH).exists():
+            print(f"Error: Model file not found at {MODEL_PATH}")
+            print("Please update MODEL_PATH in the code.")
+            exit(1)
+        
+        if not Path(CLASS_NAMES_PATH).exists():
+            print(f"Error: Class names file not found at {CLASS_NAMES_PATH}")
+            print("Please update CLASS_NAMES_PATH in the code.")
+            exit(1)
+        
+        if not Path(IMAGE_FOLDER).exists():
+            print(f"Error: Image folder not found at {IMAGE_FOLDER}")
+            print("Please update IMAGE_FOLDER in the code.")
+            exit(1)
+        
+        crop_size = CROP_SIZE if CROP_SIZE > 0 else None
+        
+        # Check if IMAGE_FOLDER has subdirectories (class folders) or just images
+        image_folder_path = Path(IMAGE_FOLDER)
+        has_subdirs = any(item.is_dir() for item in image_folder_path.iterdir() if item.name != 'unused')
+        
+        if has_subdirs:
+            # Use table mode for organized dataset
+            print("Detected class folders - using table mode\n")
+            create_prediction_table(
+                test_dir=IMAGE_FOLDER,
+                model_path=MODEL_PATH,
+                class_names_path=CLASS_NAMES_PATH,
+                output_csv=OUTPUT_CSV,
+                model_name=MODEL_NAME,
+                crop_size=crop_size
+            )
+        else:
+            # Use directory mode for flat folder
+            print("No class folders detected - using directory mode\n")
+            predict_from_directory(
+                model_path=MODEL_PATH,
+                image_dir=IMAGE_FOLDER,
+                class_names_path=CLASS_NAMES_PATH,
+                output_csv=OUTPUT_CSV,
+                model_name=MODEL_NAME,
+                crop_size=crop_size
+            )
+    else:
+        # Use command line arguments
+        main()

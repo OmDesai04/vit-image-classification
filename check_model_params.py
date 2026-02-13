@@ -8,10 +8,11 @@ print("="*75)
 print("CHECKING VIT-BASE PATCH VARIANTS")
 print("="*75)
 
-# Test ViT-Base patch variants
+# Test ViT-Base patch variants and other models
 models_to_test = [
-    'vit_base_patch8_224',
+    'mobilevit_s',
     'vit_base_patch16_224',
+    'vit_tiny_patch16_224',
     'vit_base_patch32_224',
 ]
 
