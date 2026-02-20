@@ -3,11 +3,11 @@ DATA_CONFIG = {
     'image_size': 224,
     'batch_size': 32,
     'num_workers': 2,
-    'crop_size': 180,  # Center crop to 180x180 before resize (focuses on center, removes ~20% edges)
+    'crop_size': 224,  # Center crop to 224x224 (no edge removal, just crop to model size)
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_base_patch32_224',  # ViT-Base Patch32 (88M params) - Larger patches = less details
+    'model_name': 'vit_base_patch16_224',  # ViT-Base Patch16 (86M params) - Smaller patches = more details
     'pretrained': True,
     'freeze_backbone': False,
 }
