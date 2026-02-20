@@ -13,15 +13,15 @@ MODEL_CONFIG = {
 }
 
 TRAIN_CONFIG = {
-    'epochs': 20,
-    'learning_rate': 1e-5,  # Very low LR
-    'weight_decay': 0.25,  # High weight decay
+    'epochs': 30,
+    'learning_rate': 3e-4,  # Standard learning rate for fine-tuning
+    'weight_decay': 0.01,  # Light weight decay
     'scheduler': 'plateau',
-    'early_stopping_patience': 7,
-    'label_smoothing': 0.45,  # Balanced label smoothing (45%)
-    'dropout': 0.55,  # Balanced dropout (55%)
-    'use_mixup': True,
-    'mixup_alpha': 0.9,  # Strong mixup
+    'early_stopping_patience': 10,
+    'label_smoothing': 0.1,  # Light label smoothing (10% - standard for best accuracy)
+    'dropout': 0.1,  # Light dropout (10% - minimal impact on accuracy)
+    'use_mixup': False,  # Disable mixup for higher accuracy
+    'mixup_alpha': 0.2,  # Lighter mixup if enabled
 }
 
 OUTPUT_CONFIG = {
