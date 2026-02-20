@@ -34,9 +34,8 @@ class Trainer:
         self.device = device
         self.config = config
 
-        # Very strong label smoothing to prevent 100% accuracy and overconfidence
-        label_smoothing = config.get('label_smoothing', 0.35)
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+        # NO label smoothing - for maximum accuracy
+        self.criterion = nn.CrossEntropyLoss()
 
         self.optimizer = optim.AdamW(
             self.model.parameters(),
@@ -71,9 +70,8 @@ class Trainer:
         
         self.total_training_time = 0
         
-        # Mixup parameters for strong regularization
-        self.use_mixup = config.get('use_mixup', True)
-        self.mixup_alpha = config.get('mixup_alpha', 0.4)
+        # Mixup DISABLED for maximum accuracy
+        self.use_mixup = False
     
     def mixup_data(self, x, y, alpha=0.4):
         """Apply mixup augmentation to prevent overfitting"""
@@ -101,26 +99,20 @@ class Trainer:
 
         for images, labels in tqdm(self.train_loader, desc=f"Epoch {epoch+1} [Train]"):
             images, labels = images.to(self.device), labels.to(self.device)
-            original_labels = labels.clone()  # Keep original labels for accuracy calculation
 
             self.optimizer.zero_grad()
             
-            # Apply mixup augmentation for strong regularization
-            if self.use_mixup and np.random.rand() > 0.2:  # 80% chance to apply mixup for regularization
-                images, labels_a, labels_b, lam = self.mixup_data(images, labels, self.mixup_alpha)
-                outputs = self.model(images)
-                loss = self.mixup_criterion(outputs, labels_a, labels_b, lam)
-            else:
-                outputs = self.model(images)
-                loss = self.criterion(outputs, labels)
+            # Simple forward pass - NO mixup for best accuracy
+            outputs = self.model(images)
+            loss = self.criterion(outputs, labels)
 
             loss.backward()
             self.optimizer.step()
 
             total_loss += loss.item() * images.size(0)
             preds = torch.argmax(outputs, dim=1)
-            correct += (preds == original_labels).sum().item()
-            total += original_labels.size(0)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
 
         return correct / total, total_loss / total
 
