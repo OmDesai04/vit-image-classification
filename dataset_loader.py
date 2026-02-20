@@ -65,7 +65,8 @@ class ImageClassificationDataset(Dataset):
             class_name = class_folder.name
             class_idx = self.class_to_idx[class_name]
             
-            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff'}
+            # Support both regular images and .npy files
+            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.npy'}
             image_files = [
                 f for f in class_folder.iterdir()
                 if f.suffix.lower() in image_extensions
@@ -83,7 +84,43 @@ class ImageClassificationDataset(Dataset):
     
     def __getitem__(self, idx):
         img_path = self.image_paths[idx]
-        image = Image.open(img_path)
+        
+        # Check if file is .npy format
+        if img_path.suffix.lower() == '.npy':
+            # Load numpy array
+            image_array = np.load(img_path)
+            
+            # Handle different numpy array formats
+            # Case 1: Float array (0-1 range)
+            if image_array.dtype == np.float32 or image_array.dtype == np.float64:
+                if image_array.max() <= 1.0:
+                    image_array = (image_array * 255).astype(np.uint8)
+                else:
+                    image_array = image_array.astype(np.uint8)
+            # Case 2: Already uint8
+            elif image_array.dtype == np.uint8:
+                pass
+            # Case 3: Other integer types
+            else:
+                image_array = image_array.astype(np.uint8)
+            
+            # Ensure correct shape (H, W, C)
+            if image_array.ndim == 2:
+                # Grayscale - convert to RGB by stacking
+                image_array = np.stack([image_array, image_array, image_array], axis=-1)
+            elif image_array.ndim == 3:
+                # Check if channels are first (C, H, W) and transpose if needed
+                if image_array.shape[0] in [1, 3] and image_array.shape[0] < image_array.shape[1]:
+                    image_array = np.transpose(image_array, (1, 2, 0))
+                # If single channel, convert to RGB
+                if image_array.shape[2] == 1:
+                    image_array = np.repeat(image_array, 3, axis=2)
+            
+            # Convert numpy array to PIL Image
+            image = Image.fromarray(image_array)
+        else:
+            # Regular image loading
+            image = Image.open(img_path)
         
         if image.mode != 'RGB':
             image = image.convert('RGB')
@@ -105,19 +142,19 @@ class ImageClassificationDataset(Dataset):
 
 def get_transforms(image_size=224, is_training=True, crop_size=None):
     """
-    Get image transforms with aggressive random corner cropping.
+    Get image transforms with center cropping to focus on central regions.
     
     Args:
         image_size: Final image size for the model
         is_training: Whether to apply training augmentations
-        crop_size: Size to crop from corners (removes edge information)
+        crop_size: Size to center crop (removes edge information, focuses on center)
     """
     if is_training:
         transform_list = []
         
-        # Add AGGRESSIVE random corner crop (removes all 4 edges)
+        # Add CENTER crop to focus on center regions (both train and val use center)
         if crop_size is not None and crop_size > 0:
-            transform_list.append(RandomCornerCrop(crop_size))
+            transform_list.append(transforms.CenterCrop(crop_size))
         
         # Resize and augmentations
         transform_list.extend([
@@ -208,10 +245,11 @@ def create_dataloaders(data_root='split_dataset',
     print(f"Validation samples: {len(val_dataset)}")
     print(f"Test samples: {len(test_dataset)}")
     if crop_size is not None and crop_size > 0:
-        print(f"Image cropping: {crop_size}x{crop_size}")
-        print(f"  - Training: AGGRESSIVE random corner crops (4 corners ONLY, no center)")
-        print(f"  - Validation/Test: Center crop only")
-        print(f"  - Edge loss: ~{int((1 - crop_size/224) * 100)}% of image removed from edges")
+        edge_removal_pct = int((1 - (crop_size/224)**2) * 100)
+        print(f"Center cropping enabled: {crop_size}x{crop_size}")
+        print(f"  - All images center cropped before augmentations")
+        print(f"  - Edge removal: ~{edge_removal_pct}% of image area removed")
+        print(f"  - Model focuses on CENTER regions only")
     print(f"Image size: {image_size}x{image_size}")
     print(f"Batch size: {batch_size}")
     print("="*60 + "\n")

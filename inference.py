@@ -4,11 +4,15 @@ import argparse
 from pathlib import Path
 import numpy as np
 import torch
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import pandas as pd
 from torchvision import transforms
+import time
+import matplotlib.pyplot as plt
+import cv2
 
 from model import load_model
+from gradcam_visualizer import GradCAMVisualizer
 
 
 class ImageClassifier:
@@ -153,7 +157,20 @@ class ImageClassifier:
         return result
 
 
-def predict_single_image(model_path, image_path, class_names_path, model_name='vit_base_patch32_224', crop_size=None):
+def predict_single_image(model_path, image_path, class_names_path, model_name='vit_base_patch32_224', 
+                        crop_size=None, show_image=True, show_gradcam=True):
+    """
+    Predict single image with visualization and Grad-CAM
+    
+    Args:
+        model_path: Path to trained model
+        image_path: Path to image
+        class_names_path: Path to class names JSON
+        model_name: Model architecture name
+        crop_size: Optional cropping size
+        show_image: Display image with prediction overlay
+        show_gradcam: Generate and display Grad-CAM heatmap
+    """
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
     
@@ -164,7 +181,13 @@ def predict_single_image(model_path, image_path, class_names_path, model_name='v
         crop_size=crop_size
     )
     
+    # Start timing
+    start_time = time.time()
+    
     result = classifier.predict(image_path, return_probabilities=True)
+    
+    # End timing
+    inference_time = time.time() - start_time
     
     print("\n" + "="*60)
     print("PREDICTION RESULTS")
@@ -172,11 +195,67 @@ def predict_single_image(model_path, image_path, class_names_path, model_name='v
     print(f"Image: {result['image_path']}")
     print(f"Predicted Class: {result['predicted_class']}")
     print(f"Confidence: {result['confidence']*100:.2f}%")
-    print("\nTop-5 Predictions:")
-    print("-" * 60)
-    for i, (cls, prob) in enumerate(result['top5_predictions'], 1):
-        print(f"{i}. {cls:<20} {prob*100:>6.2f}%")
+    print(f"Inference Time: {inference_time:.3f} seconds")
     print("="*60 + "\n")
+    
+    # Display image with prediction overlay
+    if show_image:
+        try:
+            img = Image.open(image_path).convert('RGB')
+            img_display = img.copy()
+            
+            # Resize for display if too large
+            max_size = 800
+            if max(img_display.size) > max_size:
+                ratio = max_size / max(img_display.size)
+                new_size = tuple(int(dim * ratio) for dim in img_display.size)
+                img_display = img_display.resize(new_size, Image.Resampling.LANCZOS)
+            
+            # Create figure
+            plt.figure(figsize=(10, 8))
+            plt.imshow(img_display)
+            plt.axis('off')
+            
+            # Add prediction text
+            title_text = f"Predicted: {result['predicted_class']}\n" \
+                        f"Confidence: {result['confidence']*100:.2f}%\n" \
+                        f"Time: {inference_time:.3f}s"
+            plt.title(title_text, fontsize=14, fontweight='bold', pad=20)
+            
+            plt.tight_layout()
+            plt.show(block=False)
+            print("✓ Image displayed with prediction overlay")
+        except Exception as e:
+            print(f"⚠ Could not display image: {e}")
+    
+    # Generate Grad-CAM heatmap
+    if show_gradcam:
+        try:
+            print("\nGenerating Grad-CAM heatmap...")
+            visualizer = GradCAMVisualizer(
+                model_path=model_path,
+                class_names_path=class_names_path,
+                model_name=model_name
+            )
+            
+            # Generate output path
+            image_path_obj = Path(image_path)
+            output_path = image_path_obj.parent / f"gradcam_{image_path_obj.stem}.png"
+            
+            visualizer.visualize_gradcam(
+                image_path=str(image_path),
+                output_path=str(output_path),
+                alpha=0.4
+            )
+            
+            result['gradcam_path'] = str(output_path)
+        except Exception as e:
+            print(f"⚠ Could not generate Grad-CAM: {e}")
+    
+    # Keep windows open
+    if show_image or show_gradcam:
+        print("\n[Close the visualization window to continue]")
+        plt.show()
     
     return result
 
@@ -245,6 +324,9 @@ def create_prediction_table(test_dir, model_path, class_names_path, output_csv, 
     results = []
     correct_predictions = 0
     
+    # Start timing
+    start_time = time.time()
+    
     print("\nGenerating predictions...")
     for i, (img_path, true_label) in enumerate(image_data, 1):
         try:
@@ -275,6 +357,10 @@ def create_prediction_table(test_dir, model_path, class_names_path, output_csv, 
                 'Correct': '✗'
             })
     
+    # End timing
+    end_time = time.time()
+    time_taken = end_time - start_time
+    
     if not results:
         print("\nNo results to save. Exiting.")
         return
@@ -288,13 +374,24 @@ def create_prediction_table(test_dir, model_path, class_names_path, output_csv, 
     df.to_csv(output_csv, index=False)
     
     accuracy = (correct_predictions / len(results)) * 100 if results else 0
+    images_per_second = len(results) / time_taken if time_taken > 0 else 0
+    
+    # Format time as "X min Y sec"
+    minutes = int(time_taken // 60)
+    seconds = int(time_taken % 60)
+    if minutes > 0:
+        time_str = f"{minutes} min {seconds} sec"
+    else:
+        time_str = f"{seconds} sec"
     
     print("\n" + "="*60)
     print("PREDICTION TABLE GENERATED")
     print("="*60)
+    print(f"Model: {model_name}")
     print(f"Total images: {len(results)}")
     print(f"Correct predictions: {correct_predictions}")
     print(f"Accuracy: {accuracy:.2f}%")
+    print(f"Time taken: {time_str} ({images_per_second:.2f} images/sec)")
     print(f"Results saved to: {output_csv}")
     print("="*60 + "\n")
     
@@ -381,22 +478,65 @@ def main():
 
 if __name__ == "__main__":
     # ============================================================================
-    # BATCH PREDICTION CONFIGURATION - EDIT THESE VALUES
+    # PREDICTION CONFIGURATION - EDIT THESE VALUES
     # ============================================================================
-    RUN_MODE = 'auto'  # 'auto' to use config below, 'cli' to use command line args
+    RUN_MODE = 'single'  # OPTIONS: 'single', 'batch', 'cli'
+                         # 'single' - predict one image (set SINGLE_IMAGE_PATH below)
+                         # 'batch'  - predict folder of images (set IMAGE_FOLDER below)
+                         # 'cli'    - use command line arguments
     
-    # Configure your paths here:
-    MODEL_PATH = 'outputs/best_model.pth'
-    CLASS_NAMES_PATH = 'outputs/class_names.json'
-    IMAGE_FOLDER = 'split_dataset/test'  # Change this to your image folder
-    OUTPUT_CSV = 'outputs/predictions.csv'
-    MODEL_NAME = 'vit_base_patch32_224'
-    CROP_SIZE = 0  # Set to 0 to disable cropping, or use value like 256
+    # Configure your paths here (use r'...' for Windows paths):
+    MODEL_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\mobilevit.pth' 
+    CLASS_NAMES_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\class_names.json'
+    MODEL_NAME = 'mobilevit_s'  # MUST match the architecture used during training
+    CROP_SIZE = 0  # Set to 0 for inference (cropping only used during training)
+    
+    # FOR SINGLE IMAGE PREDICTION:
+    SINGLE_IMAGE_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\unused\l=-5\camera_frame_l-5_f4_20250918_104041.png'  # Change to your image path
+    SHOW_IMAGE = False  # Display simple image with prediction (set False to only show Grad-CAM)
+    SHOW_GRADCAM = True  # Generate and display Grad-CAM heatmap
+    
+    # FOR BATCH PREDICTION:
+    IMAGE_FOLDER = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\unused'  # Change this to your image folder
+    OUTPUT_CSV = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\predictions.csv'
     
     # ============================================================================
     
-    if RUN_MODE == 'auto':
-        # Run with configured paths
+    if RUN_MODE == 'single':
+        # SINGLE IMAGE PREDICTION
+        print("Running single image prediction...")
+        print(f"Model: {MODEL_PATH}")
+        print(f"Image: {SINGLE_IMAGE_PATH}\n")
+        
+        if not Path(MODEL_PATH).exists():
+            print(f"Error: Model file not found at {MODEL_PATH}")
+            print("Please update MODEL_PATH in the code.")
+            exit(1)
+        
+        if not Path(CLASS_NAMES_PATH).exists():
+            print(f"Error: Class names file not found at {CLASS_NAMES_PATH}")
+            print("Please update CLASS_NAMES_PATH in the code.")
+            exit(1)
+        
+        if not Path(SINGLE_IMAGE_PATH).exists():
+            print(f"Error: Image file not found at {SINGLE_IMAGE_PATH}")
+            print("Please update SINGLE_IMAGE_PATH in the code.")
+            exit(1)
+        
+        crop_size = CROP_SIZE if CROP_SIZE > 0 else None
+        
+        predict_single_image(
+            model_path=MODEL_PATH,
+            image_path=SINGLE_IMAGE_PATH,
+            class_names_path=CLASS_NAMES_PATH,
+            model_name=MODEL_NAME,
+            crop_size=crop_size,
+            show_image=SHOW_IMAGE,
+            show_gradcam=SHOW_GRADCAM
+        )
+    
+    elif RUN_MODE == 'batch':
+        # BATCH PREDICTION
         print("Running batch prediction with configured paths...")
         print(f"Model: {MODEL_PATH}")
         print(f"Images: {IMAGE_FOLDER}")
@@ -445,6 +585,7 @@ if __name__ == "__main__":
                 model_name=MODEL_NAME,
                 crop_size=crop_size
             )
+    
     else:
         # Use command line arguments
         main()

@@ -3,7 +3,7 @@ DATA_CONFIG = {
     'image_size': 224,
     'batch_size': 32,
     'num_workers': 2,
-    'crop_size': None,  # NO cropping - using full images with patch32
+    'crop_size': 180,  # Center crop to 180x180 before resize (focuses on center, removes ~20% edges)
 }
 
 MODEL_CONFIG = {

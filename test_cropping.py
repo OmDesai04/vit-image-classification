@@ -12,8 +12,28 @@ from pathlib import Path
 def visualize_cropping(image_path, crop_size=256, final_size=224):
     """Visualize the effect of cropping on an image"""
     
-    # Load image
-    image = Image.open(image_path).convert('RGB')
+    # Load image (support both regular images and .npy files)
+    if Path(image_path).suffix.lower() == '.npy':
+        # Load numpy array
+        image_array = np.load(image_path)
+        
+        # Convert to uint8 if needed
+        if image_array.dtype in [np.float32, np.float64]:
+            if image_array.max() <= 1.0:
+                image_array = (image_array * 255).astype(np.uint8)
+            else:
+                image_array = image_array.astype(np.uint8)
+        
+        # Handle shape
+        if image_array.ndim == 2:
+            image_array = np.stack([image_array, image_array, image_array], axis=-1)
+        elif image_array.ndim == 3 and image_array.shape[0] in [1, 3]:
+            image_array = np.transpose(image_array, (1, 2, 0))
+        
+        image = Image.fromarray(image_array).convert('RGB')
+    else:
+        image = Image.open(image_path).convert('RGB')
+    
     original_size = image.size
     
     # Create transforms with cropping
@@ -129,13 +149,17 @@ def main():
         # Get first image from first class
         class_folders = [d for d in dataset_path.iterdir() if d.is_dir()]
         if class_folders:
-            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
+            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.npy'}
             images = [f for f in class_folders[0].iterdir() if f.suffix.lower() in image_extensions]
             
             if images:
                 sample_image = images[0]
                 print(f"   Using sample image: {sample_image}")
-                visualize_cropping(sample_image, crop_size=256, final_size=224)
+                # Use the crop_size from config
+                if crop_size:
+                    visualize_cropping(sample_image, crop_size=crop_size, final_size=224)
+                else:
+                    print("   ⚠ Cropping disabled in config")
             else:
                 print("   ⚠ No images found for visualization")
         else:
@@ -147,11 +171,16 @@ def main():
     print("  CROPPING VERIFICATION COMPLETE")
     print("="*70)
     print("\nSUMMARY:")
-    print("  • Images will be center-cropped to 256x256")
-    print("  • Then resized to 224x224 for the model")
-    print("  • This focuses on the central region of images")
-    print("  • Helps remove edge artifacts and background clutter")
-    print("\nTo disable cropping: Set 'crop_size' to None in config.py")
+    if crop_size:
+        edge_removal = int((1 - (crop_size/224)**2) * 100)
+        print(f"  • Images will be CENTER-CROPPED to {crop_size}x{crop_size}")
+        print(f"  • Then resized to 224x224 for the model")
+        print(f"  • Edge removal: ~{edge_removal}% of image area removed")
+        print(f"  • This focuses on the CENTRAL region of images")
+        print(f"  • Helps remove edge artifacts and background clutter")
+    else:
+        print("  • Cropping is DISABLED - using full images")
+    print("\nTo change cropping: Modify 'crop_size' in config.py")
     print("="*70 + "\n")
 
 if __name__ == "__main__":
