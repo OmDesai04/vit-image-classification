@@ -1,9 +1,9 @@
 DATA_CONFIG = {
     'data_root': 'split_dataset',
     'image_size': 224,
-    'batch_size': 16,  # Reduced for faster epochs
-    'num_workers': 4,  # Increased for faster data loading
-    'crop_size': 224,  # Center crop to 224x224 (KEEPING as requested)
+    'batch_size': 16,
+    'num_workers': 0,  # Set to 0 for Windows (fixes DataLoader warning)
+    'crop_size': 224,  # Center crop to 224x224 to maintain aspect ratio
 }
 
 MODEL_CONFIG = {
@@ -14,12 +14,12 @@ MODEL_CONFIG = {
 
 TRAIN_CONFIG = {
     'epochs': 30,
-    'learning_rate': 1e-3,  # INCREASED - was too low for learning
+    'learning_rate': 3e-4,  # Lower for pretrained model fine-tuning
     'weight_decay': 0.01,
     'scheduler': 'plateau',
     'early_stopping_patience': 10,
-    'label_smoothing': 0.0,  # DISABLED - no smoothing for clear learning signal
-    'dropout': 0.0,  # DISABLED initially - can add back after model learns
+    'label_smoothing': 0.0,
+    'dropout': 0.0,
     'use_mixup': False,
     'mixup_alpha': 0.2,
 }

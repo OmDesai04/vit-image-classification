@@ -100,7 +100,15 @@ class ImageClassificationDataset(Dataset):
             # Case 2: Already uint8
             elif image_array.dtype == np.uint8:
                 pass
-            # Case 3: Other integer types
+            # Case 3: uint16 - SCALE to 0-255 range properly
+            elif image_array.dtype == np.uint16:
+                # Normalize to 0-255 range
+                img_min, img_max = image_array.min(), image_array.max()
+                if img_max > img_min:
+                    image_array = ((image_array - img_min) / (img_max - img_min) * 255).astype(np.uint8)
+                else:
+                    image_array = np.zeros_like(image_array, dtype=np.uint8)
+            # Case 4: Other integer types
             else:
                 image_array = image_array.astype(np.uint8)
             
@@ -152,16 +160,12 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
     if is_training:
         transform_list = []
         
-        # Add CENTER crop to focus on center regions (KEEPING THIS AS REQUESTED)
-        if crop_size is not None and crop_size > 0:
-            transform_list.append(transforms.CenterCrop(crop_size))
+        # RESIZE FIRST to handle large images (1024x1224 → 224x224)
+        transform_list.append(transforms.Resize((image_size, image_size)))
         
-        # Resize and LIGHTER augmentations for better learning
+        # MINIMAL augmentations - keep it simple for learning
         transform_list.extend([
-            transforms.Resize((image_size, image_size)),
             transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomRotation(degrees=15),  # Reduced from 50
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Much lighter
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225])
@@ -169,19 +173,12 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
         
         transform = transforms.Compose(transform_list)
     else:
-        transform_list = []
-        
-        # Add center crop if specified
-        if crop_size is not None and crop_size > 0:
-            transform_list.append(transforms.CenterCrop(crop_size))
-        
-        # Resize and normalization
-        transform_list.extend([
+        transform_list = [
             transforms.Resize((image_size, image_size)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225])
-        ])
+        ]
         
         transform = transforms.Compose(transform_list)
     
@@ -237,14 +234,9 @@ def create_dataloaders(data_root='split_dataset',
     print(f"Training samples: {len(train_dataset)}")
     print(f"Validation samples: {len(val_dataset)}")
     print(f"Test samples: {len(test_dataset)}")
-    if crop_size is not None and crop_size > 0:
-        edge_removal_pct = int((1 - (crop_size/224)**2) * 100)
-        print(f"Center cropping enabled: {crop_size}x{crop_size}")
-        print(f"  - All images center cropped before augmentations")
-        print(f"  - Edge removal: ~{edge_removal_pct}% of image area removed")
-        print(f"  - Model focuses on CENTER regions only")
     print(f"Image size: {image_size}x{image_size}")
     print(f"Batch size: {batch_size}")
+    print(f"Num workers: {num_workers}")
     print("="*60 + "\n")
     
     train_loader = DataLoader(
