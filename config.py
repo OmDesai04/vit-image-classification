@@ -1,9 +1,9 @@
 DATA_CONFIG = {
     'data_root': 'split_dataset',
     'image_size': 224,
-    'batch_size': 32,
-    'num_workers': 2,
-    'crop_size': 224,  # Center crop to 224x224 (no edge removal, just crop to model size)
+    'batch_size': 16,  # Reduced for faster epochs
+    'num_workers': 4,  # Increased for faster data loading
+    'crop_size': 224,  # Center crop to 224x224 (KEEPING as requested)
 }
 
 MODEL_CONFIG = {
@@ -14,14 +14,14 @@ MODEL_CONFIG = {
 
 TRAIN_CONFIG = {
     'epochs': 30,
-    'learning_rate': 3e-4,  # Standard learning rate for fine-tuning
-    'weight_decay': 0.01,  # Light weight decay
+    'learning_rate': 1e-3,  # INCREASED - was too low for learning
+    'weight_decay': 0.01,
     'scheduler': 'plateau',
     'early_stopping_patience': 10,
-    'label_smoothing': 0.1,  # Light label smoothing (10% - standard for best accuracy)
-    'dropout': 0.1,  # Light dropout (10% - minimal impact on accuracy)
-    'use_mixup': False,  # Disable mixup for higher accuracy
-    'mixup_alpha': 0.2,  # Lighter mixup if enabled
+    'label_smoothing': 0.0,  # DISABLED - no smoothing for clear learning signal
+    'dropout': 0.0,  # DISABLED initially - can add back after model learns
+    'use_mixup': False,
+    'mixup_alpha': 0.2,
 }
 
 OUTPUT_CONFIG = {

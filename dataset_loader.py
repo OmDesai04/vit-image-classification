@@ -152,24 +152,17 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
     if is_training:
         transform_list = []
         
-        # Add CENTER crop to focus on center regions (both train and val use center)
+        # Add CENTER crop to focus on center regions (KEEPING THIS AS REQUESTED)
         if crop_size is not None and crop_size > 0:
             transform_list.append(transforms.CenterCrop(crop_size))
         
-        # Resize and augmentations
+        # Resize and LIGHTER augmentations for better learning
         transform_list.extend([
             transforms.Resize((image_size, image_size)),
             transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.4),  # Increased
-            transforms.RandomRotation(degrees=50),  # Very aggressive
-            transforms.RandomAffine(degrees=0, translate=(0.25, 0.25), scale=(0.75, 1.25)),  # Very aggressive
-            transforms.RandomPerspective(distortion_scale=0.3, p=0.4),  # Add perspective distortion
-            transforms.ColorJitter(brightness=0.6, contrast=0.6, saturation=0.5, hue=0.25),  # Very strong
-            transforms.RandomGrayscale(p=0.25),  # Increased
-            transforms.RandomInvert(p=0.15),  # Add random inversion
-            transforms.GaussianBlur(kernel_size=7, sigma=(0.1, 4.0)),  # Very strong blur
+            transforms.RandomRotation(degrees=15),  # Reduced from 50
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),  # Much lighter
             transforms.ToTensor(),
-            transforms.RandomErasing(p=0.5, scale=(0.02, 0.35)),  # Very aggressive erasing
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225])
         ])
