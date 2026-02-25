@@ -150,7 +150,7 @@ class ImageClassificationDataset(Dataset):
 
 def get_transforms(image_size=224, is_training=True, crop_size=None):
     """
-    Get image transforms with center cropping to focus on central regions.
+    Get image transforms with strong augmentation for better generalization.
     
     Args:
         image_size: Final image size for the model
@@ -160,15 +160,22 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
     if is_training:
         transform_list = []
         
-        # RESIZE FIRST to handle large images (1024x1224 → 224x224)
-        transform_list.append(transforms.Resize((image_size, image_size)))
+        # RESIZE with some margin for cropping
+        resize_size = int(image_size * 1.1)  # 10% larger for random crop
+        transform_list.append(transforms.Resize((resize_size, resize_size)))
         
-        # MINIMAL augmentations - keep it simple for learning
+        # Strong augmentations for better accuracy
         transform_list.extend([
+            transforms.RandomCrop(image_size),  # Random crop instead of center
             transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.2),  # Useful for some patterns
+            transforms.RandomRotation(degrees=15),  # Small rotations
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                               std=[0.229, 0.224, 0.225])
+                               std=[0.229, 0.224, 0.225]),
+            transforms.RandomErasing(p=0.1, scale=(0.02, 0.1))  # Cutout augmentation
         ])
         
         transform = transforms.Compose(transform_list)
@@ -189,7 +196,10 @@ def create_dataloaders(data_root='split_dataset',
                       batch_size=32, 
                       num_workers=4,
                       image_size=224,
-                      crop_size=None):
+                      crop_size=None,
+                      pin_memory=True,
+                      persistent_workers=True,
+                      prefetch_factor=2):
     data_root = Path(data_root)
     
     train_dir = data_root / 'train'
@@ -237,30 +247,38 @@ def create_dataloaders(data_root='split_dataset',
     print(f"Image size: {image_size}x{image_size}")
     print(f"Batch size: {batch_size}")
     print(f"Num workers: {num_workers}")
+    print(f"Pin memory: {pin_memory}")
+    print(f"Persistent workers: {persistent_workers if num_workers > 0 else 'N/A'}")
     print("="*60 + "\n")
+    
+    # Optimize dataloader settings for faster training
+    dataloader_kwargs = {
+        'batch_size': batch_size,
+        'num_workers': num_workers,
+        'pin_memory': pin_memory,
+    }
+    
+    # Add persistent_workers and prefetch_factor only if num_workers > 0
+    if num_workers > 0:
+        dataloader_kwargs['persistent_workers'] = persistent_workers
+        dataloader_kwargs['prefetch_factor'] = prefetch_factor
     
     train_loader = DataLoader(
         train_dataset,
-        batch_size=batch_size,
         shuffle=True,
-        num_workers=num_workers,
-        pin_memory=True
+        **dataloader_kwargs
     )
     
     val_loader = DataLoader(
         val_dataset,
-        batch_size=batch_size,
         shuffle=False,
-        num_workers=num_workers,
-        pin_memory=True
+        **dataloader_kwargs
     )
     
     test_loader = DataLoader(
         test_dataset,
-        batch_size=batch_size,
         shuffle=False,
-        num_workers=num_workers,
-        pin_memory=True
+        **dataloader_kwargs
     )
     
     return train_loader, val_loader, test_loader, num_classes, class_names

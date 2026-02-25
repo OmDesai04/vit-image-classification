@@ -6,11 +6,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import OneCycleLR
+from torch.cuda.amp import autocast, GradScaler
 
 import matplotlib.pyplot as plt
 import seaborn as sns
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from sklearn.metrics import (
     accuracy_score,
@@ -34,28 +35,55 @@ class Trainer:
         self.device = device
         self.config = config
 
-        # NO label smoothing - for maximum accuracy
-        self.criterion = nn.CrossEntropyLoss()
+        # Label smoothing for better generalization
+        label_smoothing = config.get('label_smoothing', 0.1)
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
 
         self.optimizer = optim.AdamW(
             self.model.parameters(),
             lr=config['learning_rate'],
-            weight_decay=config['weight_decay']
+            weight_decay=config['weight_decay'],
+            betas=(0.9, 0.999)
         )
 
-        self.scheduler = ReduceLROnPlateau(
-            self.optimizer,
-            mode='min',
-            factor=0.5,
-            patience=5
-        )
+        # OneCycleLR for faster convergence and better accuracy
+        total_steps = len(train_loader) * config['epochs']
+        if config.get('scheduler') == 'onecycle':
+            self.scheduler = OneCycleLR(
+                self.optimizer,
+                max_lr=config.get('max_lr', 3e-3),
+                total_steps=total_steps,
+                pct_start=config.get('warmup_epochs', 3) / config['epochs'],
+                anneal_strategy='cos',
+                div_factor=25.0,
+                final_div_factor=1e4
+            )
+            self.scheduler_step_per_batch = True
+        else:
+            # Fallback to ReduceLROnPlateau
+            from torch.optim.lr_scheduler import ReduceLROnPlateau
+            self.scheduler = ReduceLROnPlateau(
+                self.optimizer,
+                mode='min',
+                factor=0.5,
+                patience=5
+            )
+            self.scheduler_step_per_batch = False
 
         self.output_dir = Path(config['output_dir'])
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.best_val_loss = float('inf')
-        self.early_stopping_patience = config.get('early_stopping_patience', 7)
+        self.best_val_acc = 0.0
+        self.early_stopping_patience = config.get('early_stopping_patience', 10)
         self.early_stopping_counter = 0
+
+        # Mixed precision training for 2-3x speedup
+        self.use_amp = config.get('use_amp', True)
+        self.scaler = GradScaler() if self.use_amp else None
+        
+        # Gradient clipping to prevent instability
+        self.gradient_clip = config.get('gradient_clip', 1.0)
 
         self.history = {
             'train_loss': [],
@@ -65,13 +93,15 @@ class Trainer:
             'precision': [],
             'recall': [],
             'f1': [],
-            'epoch_times': []
+            'epoch_times': [],
+            'learning_rates': []
         }
         
         self.total_training_time = 0
         
-        # Mixup DISABLED for maximum accuracy
-        self.use_mixup = False
+        # Mixup for better accuracy and generalization
+        self.use_mixup = config.get('use_mixup', True)
+        self.mixup_alpha = config.get('mixup_alpha', 0.2)
     
     def mixup_data(self, x, y, alpha=0.4):
         """Apply mixup augmentation to prevent overfitting"""
@@ -97,22 +127,49 @@ class Trainer:
         correct, total = 0, 0
         total_loss = 0
 
-        for images, labels in tqdm(self.train_loader, desc=f"Epoch {epoch+1} [Train]"):
-            images, labels = images.to(self.device), labels.to(self.device)
+        pbar = tqdm(self.train_loader, desc=f"Epoch {epoch+1} [Train]", leave=False)
+        for images, labels in pbar:
+            images, labels = images.to(self.device, non_blocking=True), labels.to(self.device, non_blocking=True)
 
-            self.optimizer.zero_grad()
+            self.optimizer.zero_grad(set_to_none=True)  # More efficient than zero_grad()
             
-            # Simple forward pass - NO mixup for best accuracy
-            outputs = self.model(images)
-            loss = self.criterion(outputs, labels)
+            # Mixed precision training
+            with autocast(enabled=self.use_amp):
+                if self.use_mixup:
+                    # Apply mixup augmentation
+                    mixed_images, y_a, y_b, lam = self.mixup_data(images, labels, self.mixup_alpha)
+                    outputs = self.model(mixed_images)
+                    loss = self.mixup_criterion(outputs, y_a, y_b, lam)
+                else:
+                    outputs = self.model(images)
+                    loss = self.criterion(outputs, labels)
 
-            loss.backward()
-            self.optimizer.step()
+            # Backward pass with gradient scaling
+            if self.use_amp:
+                self.scaler.scale(loss).backward()
+                # Gradient clipping
+                if self.gradient_clip > 0:
+                    self.scaler.unscale_(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+            else:
+                loss.backward()
+                if self.gradient_clip > 0:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+                self.optimizer.step()
+
+            # Step scheduler per batch if using OneCycleLR
+            if self.scheduler_step_per_batch:
+                self.scheduler.step()
 
             total_loss += loss.item() * images.size(0)
             preds = torch.argmax(outputs, dim=1)
             correct += (preds == labels).sum().item()
             total += labels.size(0)
+            
+            # Update progress bar
+            pbar.set_postfix({'loss': f'{loss.item():.4f}', 'acc': f'{100*correct/total:.2f}%'})
 
         return correct / total, total_loss / total
 
@@ -123,10 +180,14 @@ class Trainer:
         total_loss = 0
 
         with torch.no_grad():
-            for images, labels in tqdm(self.val_loader, desc=f"Epoch {epoch+1} [Val]"):
-                images, labels = images.to(self.device), labels.to(self.device)
-                outputs = self.model(images)
-                loss = self.criterion(outputs, labels)
+            pbar = tqdm(self.val_loader, desc=f"Epoch {epoch+1} [Val]", leave=False)
+            for images, labels in pbar:
+                images, labels = images.to(self.device, non_blocking=True), labels.to(self.device, non_blocking=True)
+                
+                # Mixed precision for validation too
+                with autocast(enabled=self.use_amp):
+                    outputs = self.model(images)
+                    loss = self.criterion(outputs, labels)
 
                 total_loss += loss.item() * images.size(0)
                 preds = torch.argmax(outputs, dim=1)
@@ -227,6 +288,7 @@ class Trainer:
             'training_summary': {
                 'total_epochs': len(self.history['train_acc']),
                 'best_val_loss': float(self.best_val_loss),
+                'best_val_acc': float(self.best_val_acc),
                 'total_training_time': self.format_time(self.total_training_time)
             },
             'final_metrics': {
@@ -244,6 +306,7 @@ class Trainer:
                 'precision': [float(x) for x in self.history['precision']],
                 'recall': [float(x) for x in self.history['recall']],
                 'f1_score': [float(x) for x in self.history['f1']],
+                'learning_rates': [float(x) for x in self.history['learning_rates']],
                 'epoch_times': [self.format_time(t) for t in self.history['epoch_times']]
             },
             'model_config': self.config
@@ -264,13 +327,27 @@ class Trainer:
     def train(self):
         training_start_time = time.time()
         
+        print(f"\n{'='*80}")
+        print(f"🚀 Starting Training with:")
+        print(f"   - Mixed Precision (AMP): {'✓' if self.use_amp else '✗'}")
+        print(f"   - Mixup Augmentation: {'✓' if self.use_mixup else '✗'}")
+        print(f"   - Gradient Clipping: {self.gradient_clip}")
+        print(f"   - Scheduler: {'OneCycleLR' if self.scheduler_step_per_batch else 'ReduceLROnPlateau'}")
+        print(f"{'='*80}\n")
+        
         for epoch in range(self.config['epochs']):
             epoch_start_time = time.time()
 
             train_acc, train_loss = self.train_epoch(epoch)
             val_loss, val_acc, precision, recall, f1, cm = self.validate(epoch)
 
-            self.scheduler.step(val_loss)
+            # Step scheduler per epoch if not OneCycleLR
+            if not self.scheduler_step_per_batch:
+                self.scheduler.step(val_loss)
+            
+            # Record learning rate
+            current_lr = self.optimizer.param_groups[0]['lr']
+            self.history['learning_rates'].append(current_lr)
 
             epoch_time = time.time() - epoch_start_time
 
@@ -291,13 +368,22 @@ class Trainer:
             print(f"  Precision:      {precision:.4f}")
             print(f"  Recall:         {recall:.4f}")
             print(f"  F1 Score:       {f1:.4f}")
+            print(f"  Learning Rate:  {current_lr:.2e}")
             print(f"  Epoch Time:     {self.format_time(epoch_time)}")
             print("-" * 60)
 
-            if val_loss < self.best_val_loss:
+            # Save best model based on validation accuracy (better metric than loss)
+            if val_acc > self.best_val_acc:
+                self.best_val_acc = val_acc
                 self.best_val_loss = val_loss
                 self.early_stopping_counter = 0
-                torch.save(self.model.state_dict(), self.output_dir / "best_model.pth")
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': self.model.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    'val_acc': val_acc,
+                    'val_loss': val_loss,
+                }, self.output_dir / "best_model.pth")
                 print("  ✅ Model saved!")
             else:
                 self.early_stopping_counter += 1
@@ -414,13 +500,23 @@ def main():
     # ========================================================================
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    print(f"\n{'='*80}")
+    print(f"🚀 PyTorch Version: {torch.__version__}")
+    print(f"🔥 CUDA Available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        print(f"🎮 GPU: {torch.cuda.get_device_name(0)}")
+    print(f"{'='*80}\n")
 
     train_loader, val_loader, _, num_classes, class_names = create_dataloaders(
         config['data_root'],
         config['batch_size'],
         config['num_workers'],
         config['image_size'],
-        config.get('crop_size', None)
+        config.get('crop_size', None),
+        config.get('pin_memory', True),
+        config.get('persistent_workers', True),
+        config.get('prefetch_factor', 2)
     )
     
     # Save class names to JSON file for inference
@@ -436,8 +532,17 @@ def main():
         config['model_name'],
         config['pretrained'],
         config['freeze_backbone'],
-        config.get('dropout', 0.3)
+        config.get('dropout', 0.1)
     )
+    
+    # PyTorch 2.0+ compile for ~30% speedup (if available)
+    if config.get('use_compile', False) and hasattr(torch, 'compile'):
+        try:
+            print("🔥 Compiling model with PyTorch 2.0+ (this may take a minute)...")
+            model = torch.compile(model, mode='max-autotune')
+            print("✅ Model compiled successfully!\n")
+        except Exception as e:
+            print(f"⚠️ Model compilation failed: {e}\n")
 
     # Print detailed information before training
     print_training_info(config, device, train_loader, val_loader, num_classes, model)
