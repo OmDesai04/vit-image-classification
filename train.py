@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import OneCycleLR
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -80,7 +80,7 @@ class Trainer:
 
         # Mixed precision training for 2-3x speedup
         self.use_amp = config.get('use_amp', True)
-        self.scaler = GradScaler() if self.use_amp else None
+        self.scaler = GradScaler('cuda') if self.use_amp else None
         
         # Gradient clipping to prevent instability
         self.gradient_clip = config.get('gradient_clip', 1.0)
@@ -134,7 +134,7 @@ class Trainer:
             self.optimizer.zero_grad(set_to_none=True)  # More efficient than zero_grad()
             
             # Mixed precision training
-            with autocast(enabled=self.use_amp):
+            with autocast('cuda', enabled=self.use_amp):
                 if self.use_mixup:
                     # Apply mixup augmentation
                     mixed_images, y_a, y_b, lam = self.mixup_data(images, labels, self.mixup_alpha)
@@ -159,14 +159,14 @@ class Trainer:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
                 self.optimizer.step()
 
-            # Step scheduler per batch if using OneCycleLR
-            if self.scheduler_step_per_batch:
-                self.scheduler.step()
-
             total_loss += loss.item() * images.size(0)
             preds = torch.argmax(outputs, dim=1)
             correct += (preds == labels).sum().item()
             total += labels.size(0)
+            
+            # Step scheduler per batch if using OneCycleLR (after optimizer.step)
+            if self.scheduler_step_per_batch:
+                self.scheduler.step()
             
             # Update progress bar
             pbar.set_postfix({'loss': f'{loss.item():.4f}', 'acc': f'{100*correct/total:.2f}%'})
@@ -185,7 +185,7 @@ class Trainer:
                 images, labels = images.to(self.device, non_blocking=True), labels.to(self.device, non_blocking=True)
                 
                 # Mixed precision for validation too
-                with autocast(enabled=self.use_amp):
+                with autocast('cuda', enabled=self.use_amp):
                     outputs = self.model(images)
                     loss = self.criterion(outputs, labels)
 
