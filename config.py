@@ -1,35 +1,35 @@
 DATA_CONFIG = {
     'data_root': 'split_dataset',
     'image_size': 224,
-    'batch_size': 64,  # INCREASED for faster training (adjust based on GPU memory)
-    'num_workers': 4,  # Parallel data loading (set to 2-4 for better performance)
+    'batch_size': 128,  # INCREASED - RTX A4000 has 16GB, can handle more
+    'num_workers': 4,  # Parallel data loading
     'pin_memory': True,  # Faster CPU to GPU transfer
     'persistent_workers': True,  # Keep workers alive between epochs
     'prefetch_factor': 2,  # Prefetch batches for efficiency
-    'crop_size': None,  # DISABLED - just resize 1024x1224 to 224x224 directly
+    'crop_size': None,  # DISABLED - just resize directly
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_tiny_patch16_224',  # ViT-Tiny (5M params) - MUCH FASTER than Base (86M)
+    'model_name': 'vit_small_patch16_224',  # Upgraded to Small (22M params) - better for 64 classes
     'pretrained': True,
     'freeze_backbone': False,
-    'use_compile': True,  # PyTorch 2.0+ compile for ~30% speedup
+    'use_compile': False,  # DISABLE - causing slowdown, use standard eager mode
 }
 
 TRAIN_CONFIG = {
-    'epochs': 30,
-    'learning_rate': 3e-4,  # Optimal for ViT with OneCycleLR
-    'max_lr': 3e-3,  # Maximum learning rate for OneCycleLR
-    'weight_decay': 0.05,  # Stronger regularization
+    'epochs': 50,  # More epochs for convergence
+    'learning_rate': 1e-3,  # HIGHER - faster learning
+    'max_lr': 5e-3,  # HIGHER peak for OneCycleLR
+    'weight_decay': 0.01,  # Reduced - less regularization for small dataset
     'scheduler': 'onecycle',  # OneCycleLR for faster convergence
-    'early_stopping_patience': 10,
-    'label_smoothing': 0.1,  # Helps with generalization
-    'dropout': 0.1,  # Light dropout
-    'use_mixup': True,  # Data augmentation for better accuracy
+    'early_stopping_patience': 15,
+    'label_smoothing': 0.05,  # REDUCED - was too aggressive
+    'dropout': 0.0,  # DISABLED - pretrained model already regularized
+    'use_mixup': False,  # DISABLED - too aggressive for this dataset
     'mixup_alpha': 0.2,
-    'use_amp': True,  # Automatic Mixed Precision - 2-3x speedup
-    'gradient_clip': 1.0,  # Prevent gradient explosion
-    'warmup_epochs': 3,  # Warmup for stable training
+    'use_amp': True,  # Keep AMP for speed
+    'gradient_clip': 1.0,
+    'warmup_epochs': 5,  # Longer warmup
 }
 
 OUTPUT_CONFIG = {

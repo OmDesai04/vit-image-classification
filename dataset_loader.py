@@ -150,7 +150,7 @@ class ImageClassificationDataset(Dataset):
 
 def get_transforms(image_size=224, is_training=True, crop_size=None):
     """
-    Get image transforms with strong augmentation for better generalization.
+    Get image transforms - SIMPLIFIED for better accuracy on small dataset.
     
     Args:
         image_size: Final image size for the model
@@ -158,25 +158,14 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
         crop_size: Size to center crop (removes edge information, focuses on center)
     """
     if is_training:
-        transform_list = []
-        
-        # RESIZE with some margin for cropping
-        resize_size = int(image_size * 1.1)  # 10% larger for random crop
-        transform_list.append(transforms.Resize((resize_size, resize_size)))
-        
-        # Strong augmentations for better accuracy
-        transform_list.extend([
-            transforms.RandomCrop(image_size),  # Random crop instead of center
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.2),  # Useful for some patterns
-            transforms.RandomRotation(degrees=15),  # Small rotations
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
+        # MINIMAL augmentation - dataset is small, don't distort too much
+        transform_list = [
+            transforms.Resize((image_size, image_size)),
+            transforms.RandomHorizontalFlip(p=0.5),  # Only basic flip
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225]),
-            transforms.RandomErasing(p=0.1, scale=(0.02, 0.1))  # Cutout augmentation
-        ])
+        ]
         
         transform = transforms.Compose(transform_list)
     else:
