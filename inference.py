@@ -62,6 +62,40 @@ class ImageClassifier:
         
         return image_tensor
     
+    def preprocess_npy(self, npy_path):
+        """
+        Load and preprocess a .npy file containing image data.
+        Expects the .npy file to contain a numpy array with shape (H, W, 3) or (H, W)
+        in the range [0, 255] or [0, 1].
+        """
+        # Load the numpy array
+        image_array = np.load(npy_path)
+        
+        # Convert to float if not already
+        if image_array.dtype == np.uint8:
+            image_array = image_array.astype(np.float32) / 255.0
+        elif image_array.dtype in [np.float32, np.float64]:
+            # Check if values are in [0, 255] range
+            if image_array.max() > 1.0:
+                image_array = image_array / 255.0
+        
+        # Handle grayscale images (H, W) -> (H, W, 3)
+        if len(image_array.shape) == 2:
+            image_array = np.stack([image_array] * 3, axis=-1)
+        
+        # Ensure it's in the correct shape (H, W, C)
+        if image_array.shape[-1] != 3:
+            raise ValueError(f"Expected 3 channels, got {image_array.shape[-1]}")
+        
+        # Convert to PIL Image for transformation pipeline
+        image = Image.fromarray((image_array * 255).astype(np.uint8))
+        
+        # Apply the same transformations as regular images
+        image_tensor = self.transform(image)
+        image_tensor = image_tensor.unsqueeze(0)
+        
+        return image_tensor
+    
     def predict(self, image_path, return_probabilities=False):
         image_tensor = self.preprocess_image(image_path)
         image_tensor = image_tensor.to(self.device)
@@ -78,6 +112,40 @@ class ImageClassifier:
         
         result = {
             'image_path': str(image_path),
+            'predicted_class': predicted_class,
+            'predicted_index': predicted_idx,
+            'confidence': confidence
+        }
+        
+        if return_probabilities:
+            top5_probs, top5_indices = torch.topk(probabilities[0], k=min(5, self.num_classes))
+            top5_classes = [self.class_names[idx] for idx in top5_indices.cpu().numpy()]
+            top5_probs = top5_probs.cpu().numpy()
+            
+            result['top5_predictions'] = list(zip(top5_classes, top5_probs))
+            result['all_probabilities'] = probabilities[0].cpu().numpy().tolist()
+        
+        return result
+    
+    def predict_npy(self, npy_path, return_probabilities=False):
+        """
+        Predict from a .npy file containing image data.
+        """
+        image_tensor = self.preprocess_npy(npy_path)
+        image_tensor = image_tensor.to(self.device)
+        
+        with torch.no_grad():
+            outputs = self.model(image_tensor)
+            probabilities = torch.softmax(outputs, dim=1)
+            
+            confidence, predicted_idx = torch.max(probabilities, 1)
+            predicted_idx = predicted_idx.item()
+            confidence = confidence.item()
+        
+        predicted_class = self.class_names[predicted_idx]
+        
+        result = {
+            'npy_path': str(npy_path),
             'predicted_class': predicted_class,
             'predicted_index': predicted_idx,
             'confidence': confidence
@@ -124,6 +192,40 @@ class ImageClassifier:
         
         return results
     
+    def predict_batch_npy(self, npy_paths, output_csv=None):
+        """
+        Batch prediction for .npy files.
+        """
+        results = []
+        
+        print(f"\nProcessing {len(npy_paths)} .npy files...")
+        for i, npy_path in enumerate(npy_paths, 1):
+            try:
+                # Ensure npy_path is a Path object for consistent handling
+                if not isinstance(npy_path, Path):
+                    npy_path = Path(npy_path)
+                
+                result = self.predict_npy(npy_path)
+                results.append(result)
+                
+                if i % 10 == 0 or i == len(npy_paths):
+                    print(f"Processed {i}/{len(npy_paths)} .npy files")
+            
+            except Exception as e:
+                print(f"Error processing {npy_path}: {e}")
+                results.append({
+                    'npy_path': str(npy_path),
+                    'predicted_class': 'ERROR',
+                    'predicted_index': -1,
+                    'confidence': 0.0,
+                    'error': str(e)
+                })
+        
+        if output_csv and len(results) > 0:
+            self.save_npy_predictions_to_csv(results, output_csv)
+        
+        return results
+    
     def save_predictions_to_csv(self, results, output_path):
         if not results:
             print("No results to save.")
@@ -131,6 +233,34 @@ class ImageClassifier:
         
         data = {
             'Image Path': [r.get('image_path', '') for r in results],
+            'Predicted Class': [r.get('predicted_class', 'ERROR') for r in results],
+            'Confidence': [r.get('confidence', 0.0) for r in results]
+        }
+        
+        # Add error column if any errors exist
+        if any('error' in r for r in results):
+            data['Error'] = [r.get('error', '') for r in results]
+        
+        df = pd.DataFrame(data)
+        
+        # Create output directory if it doesn't exist
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        df.to_csv(output_path, index=False)
+        
+        print(f"\nPredictions saved to {output_path}")
+    
+    def save_npy_predictions_to_csv(self, results, output_path):
+        """
+        Save .npy prediction results to CSV.
+        """
+        if not results:
+            print("No results to save.")
+            return
+        
+        data = {
+            'NPY Path': [r.get('npy_path', '') for r in results],
             'Predicted Class': [r.get('predicted_class', 'ERROR') for r in results],
             'Confidence': [r.get('confidence', 0.0) for r in results]
         }
@@ -238,17 +368,12 @@ def predict_single_image(model_path, image_path, class_names_path, model_name='v
                 model_name=model_name
             )
             
-            # Generate output path
-            image_path_obj = Path(image_path)
-            output_path = image_path_obj.parent / f"gradcam_{image_path_obj.stem}.png"
-            
+            # Use temporary path (will be displayed, not saved permanently)
             visualizer.visualize_gradcam(
                 image_path=str(image_path),
-                output_path=str(output_path),
+                output_path="temp_gradcam.png",
                 alpha=0.4
             )
-            
-            result['gradcam_path'] = str(output_path)
         except Exception as e:
             print(f"⚠ Could not generate Grad-CAM: {e}")
     
@@ -289,6 +414,68 @@ def predict_from_directory(model_path, image_dir, class_names_path, output_csv, 
     print(f"Total images processed: {len(results)}")
     print(f"Results saved to: {output_csv}")
     print("="*60 + "\n")
+    
+    return results
+
+
+def predict_npy_directory(model_path, npy_dir, class_names_path, output_csv, model_name='vit_base_patch32_224', crop_size=None):
+    """
+    Batch prediction for all .npy files in a directory.
+    
+    Args:
+        model_path: Path to trained model
+        npy_dir: Directory containing .npy files
+        class_names_path: Path to class names JSON
+        output_csv: Path to save predictions CSV
+        model_name: Model architecture name
+        crop_size: Optional cropping size
+    """
+    with open(class_names_path, 'r') as f:
+        class_names = json.load(f)
+    
+    npy_dir = Path(npy_dir)
+    npy_paths = [f for f in npy_dir.rglob('*.npy')]
+    
+    if not npy_paths:
+        print(f"No .npy files found in {npy_dir}")
+        return
+    
+    print(f"Found {len(npy_paths)} .npy files in {npy_dir}")
+    
+    classifier = ImageClassifier(
+        model_path=model_path,
+        class_names=class_names,
+        model_name=model_name,
+        crop_size=crop_size
+    )
+    
+    start_time = time.time()
+    results = classifier.predict_batch_npy(npy_paths, output_csv=output_csv)
+    end_time = time.time()
+    
+    time_taken = end_time - start_time
+    files_per_second = len(results) / time_taken if time_taken > 0 else 0
+    
+    print("\n" + "="*60)
+    print("NPY BATCH PREDICTION SUMMARY")
+    print("="*60)
+    print(f"Total .npy files processed: {len(results)}")
+    print(f"Time taken: {time_taken:.2f} seconds ({files_per_second:.2f} files/sec)")
+    print(f"Results saved to: {output_csv}")
+    print("="*60 + "\n")
+    
+    # Show sample predictions
+    if results:
+        print("Sample predictions:")
+        print("-" * 80)
+        print(f"{'File Name':<40} {'Predicted Class':<20} {'Confidence':<10}")
+        print("-" * 80)
+        for i, res in enumerate(results[:10]):
+            file_name = Path(res.get('npy_path', '')).name
+            pred_class = res.get('predicted_class', 'ERROR')
+            confidence = res.get('confidence', 0.0)
+            print(f"{file_name:<40} {pred_class:<20} {confidence*100:.2f}%")
+        print("-" * 80 + "\n")
     
     return results
 
@@ -406,12 +593,13 @@ def create_prediction_table(test_dir, model_path, class_names_path, output_csv, 
 
 def main():
     parser = argparse.ArgumentParser(description='Image Classification Inference')
-    parser.add_argument('--mode', type=str, choices=['single', 'directory', 'table'], default='table',
-                       help='Inference mode: single image, directory of images, or prediction table')
+    parser.add_argument('--mode', type=str, choices=['single', 'directory', 'table', 'npy'], default='table',
+                       help='Inference mode: single image, directory of images, prediction table, or npy batch')
     parser.add_argument('--model', type=str, default='outputs/best_model.pth',
                        help='Path to trained model checkpoint')
     parser.add_argument('--image', type=str, help='Path to single image (for single mode)')
     parser.add_argument('--dir', type=str, help='Path to image directory (for directory mode)')
+    parser.add_argument('--npy-dir', type=str, help='Path to .npy directory (for npy mode)')
     parser.add_argument('--test-dir', type=str, default='split_dataset/test',
                        help='Path to test directory (for table mode)')
     parser.add_argument('--output', type=str, default='outputs/predictions.csv',
@@ -474,33 +662,63 @@ def main():
             model_name=args.model_name,
             crop_size=crop_size
         )
+    
+    elif args.mode == 'npy':
+        if not args.npy_dir:
+            print("Error: --npy-dir argument required for npy mode")
+            return
+        
+        predict_npy_directory(
+            model_path=args.model,
+            npy_dir=args.npy_dir,
+            class_names_path=args.class_names,
+            output_csv=args.output,
+            model_name=args.model_name,
+            crop_size=crop_size
+        )
 
 
 if __name__ == "__main__":
-    # ============================================================================
-    # PREDICTION CONFIGURATION - EDIT THESE VALUES
-    # ============================================================================
-    RUN_MODE = 'single'  # OPTIONS: 'single', 'batch', 'cli'
-                         # 'single' - predict one image (set SINGLE_IMAGE_PATH below)
-                         # 'batch'  - predict folder of images (set IMAGE_FOLDER below)
-                         # 'cli'    - use command line arguments
+    # ═══════════════════════════════════════════════════════════════════════════
+    # 📝 EASY CONFIGURATION - JUST EDIT THE PATHS BELOW
+    # ═══════════════════════════════════════════════════════════════════════════
     
-    # Configure your paths here (use r'...' for Windows paths):
+    # ──────────────────────────────────────────────────────────────────────────
+    # STEP 1: Choose your RUN_MODE
+    # ──────────────────────────────────────────────────────────────────────────
+    RUN_MODE = 'npy'  # 👈 CHANGE THIS!
+                      # OPTIONS:
+                      #   'single' → Predict one image
+                      #   'batch'  → Predict folder of images (.jpg, .png, etc.)
+                      #   'npy'    → Predict folder of .npy files
+                      #   'cli'    → Use command line arguments
+    
+    # ──────────────────────────────────────────────────────────────────────────
+    # STEP 2: Set your MODEL and CLASS NAMES paths
+    # ──────────────────────────────────────────────────────────────────────────
     MODEL_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\mobilevit.pth' 
     CLASS_NAMES_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\class_names.json'
     MODEL_NAME = 'mobilevit_s'  # MUST match the architecture used during training
     CROP_SIZE = 0  # Set to 0 for inference (cropping only used during training)
     
-    # FOR SINGLE IMAGE PREDICTION:
-    SINGLE_IMAGE_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\unused\l=-5\camera_frame_l-5_f4_20250918_104041.png'  # Change to your image path
-    SHOW_IMAGE = False  # Display simple image with prediction (set False to only show Grad-CAM)
-    SHOW_GRADCAM = True  # Generate and display Grad-CAM heatmap
+    # ──────────────────────────────────────────────────────────────────────────
+    # STEP 3: Configure paths based on your RUN_MODE
+    # ──────────────────────────────────────────────────────────────────────────
     
-    # FOR BATCH PREDICTION:
-    IMAGE_FOLDER = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\unused'  # Change this to your image folder
+    # 🖼️ FOR SINGLE IMAGE PREDICTION (RUN_MODE = 'single'):
+    SINGLE_IMAGE_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\unused\l=-5\camera_frame_l-5_f4_20250918_104041.png'
+    SHOW_IMAGE = False  # Show image with prediction overlay
+    SHOW_GRADCAM = True  # Show Grad-CAM heatmap
+    
+    # 📁 FOR BATCH IMAGE PREDICTION (RUN_MODE = 'batch'):
+    IMAGE_FOLDER = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\unused'
     OUTPUT_CSV = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\predictions.csv'
     
-    # ============================================================================
+    # 📊 FOR NPY BATCH PREDICTION (RUN_MODE = 'npy'):
+    NPY_FOLDER = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION'  # 👈 EDIT: Folder with .npy files
+    NPY_OUTPUT_CSV = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\npy_predictions.csv'  # 👈 EDIT: Output CSV path
+    
+    # ═══════════════════════════════════════════════════════════════════════════
     
     if RUN_MODE == 'single':
         # SINGLE IMAGE PREDICTION
@@ -585,6 +803,39 @@ if __name__ == "__main__":
                 model_name=MODEL_NAME,
                 crop_size=crop_size
             )
+    
+    elif RUN_MODE == 'npy':
+        # NPY BATCH PREDICTION
+        print("Running .npy batch prediction...")
+        print(f"Model: {MODEL_PATH}")
+        print(f"NPY Folder: {NPY_FOLDER}")
+        print(f"Output: {NPY_OUTPUT_CSV}\n")
+        
+        if not Path(MODEL_PATH).exists():
+            print(f"Error: Model file not found at {MODEL_PATH}")
+            print("Please update MODEL_PATH in the code.")
+            exit(1)
+        
+        if not Path(CLASS_NAMES_PATH).exists():
+            print(f"Error: Class names file not found at {CLASS_NAMES_PATH}")
+            print("Please update CLASS_NAMES_PATH in the code.")
+            exit(1)
+        
+        if not Path(NPY_FOLDER).exists():
+            print(f"Error: NPY folder not found at {NPY_FOLDER}")
+            print("Please update NPY_FOLDER in the code.")
+            exit(1)
+        
+        crop_size = CROP_SIZE if CROP_SIZE > 0 else None
+        
+        predict_npy_directory(
+            model_path=MODEL_PATH,
+            npy_dir=NPY_FOLDER,
+            class_names_path=CLASS_NAMES_PATH,
+            output_csv=NPY_OUTPUT_CSV,
+            model_name=MODEL_NAME,
+            crop_size=crop_size
+        )
     
     else:
         # Use command line arguments
