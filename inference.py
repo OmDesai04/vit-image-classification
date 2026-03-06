@@ -698,7 +698,7 @@ if __name__ == "__main__":
     # ──────────────────────────────────────────────────────────────────────────
     MODEL_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\mobilevit.pth' 
     CLASS_NAMES_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\class_names.json'
-    MODEL_NAME = 'mobilevit_s'  # MUST match the architecture used during training
+    MODEL_NAME = 'vit_small_patch16_224'  # MUST match the architecture used during training
     CROP_SIZE = 0  # Set to 0 for inference (cropping only used during training)
     
     # ──────────────────────────────────────────────────────────────────────────
