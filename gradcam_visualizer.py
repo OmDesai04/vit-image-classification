@@ -7,11 +7,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 from PIL import Image
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend - saves files instead of showing windows
 import matplotlib.pyplot as plt
 import cv2
 from pathlib import Path
 import json
 import argparse
+import os
 from torchvision import transforms
 
 from model import VisionTransformerClassifier
@@ -159,12 +162,24 @@ class GradCAMVisualizer:
                     for i in range(activations.shape[1]):
                         activations[:, i, :, :] *= pooled_gradients[i]
                     heatmap = torch.mean(activations, dim=1).squeeze().cpu().numpy()
-                else:  # Transformer features
-                    heatmap = torch.mean(torch.abs(activations), dim=[0, 1]).squeeze().cpu().numpy()
-                    # Reshape if needed
+                else:  # Transformer features [batch, seq_len, hidden_dim]
+                    # For ViT: seq_len = num_patches + 1 (CLS token)
+                    # Remove CLS token (first token) if present
+                    if activations.shape[1] > 1:
+                        activations = activations[:, 1:, :]  # Remove CLS token
+                    
+                    # Average over hidden dimension to get importance per patch
+                    heatmap = torch.mean(torch.abs(activations), dim=2).squeeze().cpu().numpy()
+                    
+                    # Reshape to spatial dimensions
                     if heatmap.ndim == 1:
                         size = int(np.sqrt(heatmap.shape[0]))
-                        heatmap = heatmap.reshape(size, size)
+                        if size * size == heatmap.shape[0]:
+                            heatmap = heatmap.reshape(size, size)
+                        else:
+                            # If not a perfect square, use gradient fallback
+                            gradients = img_tensor.grad.data.squeeze().cpu()
+                            heatmap = torch.mean(torch.abs(gradients), dim=0).numpy()
             else:
                 # Fallback to gradients
                 gradients = img_tensor.grad.data.squeeze().cpu()
@@ -243,14 +258,16 @@ class GradCAMVisualizer:
         # Add prediction info at top
         fig.suptitle(
             f'Prediction: {predicted_class}  |  Confidence: {confidence*100:.2f}%',
-            fontsize=16, fontweight='bold', y=0.98
+            fontsize=16, fontweight='bold', y=0.99
         )
         
         # Use subplots_adjust instead of tight_layout to avoid warnings
-        plt.subplots_adjust(left=0.05, right=0.95, top=0.88, bottom=0.05, wspace=0.2, hspace=0.3)
+        plt.subplots_adjust(left=0.05, right=0.95, top=0.85, bottom=0.05, wspace=0.2, hspace=0.3)
         plt.savefig(output_path, dpi=150, bbox_inches='tight')
-        # Don't close - keep it open for display
-        # plt.close()
+        plt.close()  # Close the figure to free memory
+        
+        # Open the saved image with default system viewer
+        os.startfile(output_path)
         
         print(f"✓ Visualization saved to: {output_path}")
         print(f"  Predicted: {predicted_class}")
@@ -301,10 +318,10 @@ def main():
     # ========================================================================
     # CONFIGURE YOUR PATHS HERE (or use command line arguments)
     # ========================================================================
-    DEFAULT_MODEL_PATH = None        # Set to your .pth file path, e.g., 'C:/path/to/best_model.pth'
-    DEFAULT_CLASS_NAMES_PATH = None  # Set to your class_names.json path, e.g., 'C:/path/to/class_names.json'
+    DEFAULT_MODEL_PATH = r"C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\mobilevit.pth"        # Set to your .pth file path, e.g., 'C:/path/to/best_model.pth'
+    DEFAULT_CLASS_NAMES_PATH = r"C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\class_names.json"  # Set to your class_names.json path, e.g., 'C:/path/to/class_names.json'
     DEFAULT_IMAGE_DIR = None         # Set to your image directory path, e.g., 'C:/Users/YourName/Images'
-    DEFAULT_IMAGE = None             # Set to your single image path, e.g., 'C:/Users/YourName/test.jpg'
+    DEFAULT_IMAGE = r"C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\unused\l=-13\camera_frame_l-13_f59_20250918_102836.png"             # Set to your single image path, e.g., 'C:/Users/YourName/test.jpg'
     # ========================================================================
     
     parser = argparse.ArgumentParser(description='Grad-CAM Visualization for ViT')
