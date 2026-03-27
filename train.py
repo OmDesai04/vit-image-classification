@@ -37,7 +37,20 @@ class Trainer:
 
         # Label smoothing for better generalization
         label_smoothing = config.get('label_smoothing', 0.1)
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+        class_weights = None
+        if config.get('use_class_weights', False):
+            labels = np.array(self.train_loader.dataset.labels)
+            class_counts = np.bincount(labels)
+            class_counts = np.maximum(class_counts, 1)
+            inv_freq = 1.0 / class_counts
+            normalized = inv_freq / inv_freq.mean()
+            class_weights = torch.tensor(normalized, dtype=torch.float32, device=device)
+            print("Using class-weighted CrossEntropyLoss")
+
+        self.criterion = nn.CrossEntropyLoss(
+            weight=class_weights,
+            label_smoothing=label_smoothing
+        )
 
         self.optimizer = optim.AdamW(
             self.model.parameters(),
@@ -339,6 +352,7 @@ class Trainer:
         print(f"🚀 Starting Training with:")
         print(f"   - Mixed Precision (AMP): {'✓' if self.use_amp else '✗'}")
         print(f"   - Mixup Augmentation: {'✓' if self.use_mixup else '✗'}")
+        print(f"   - Class Weighted Loss: {'✓' if self.config.get('use_class_weights', False) else '✗'}")
         print(f"   - Gradient Clipping: {self.gradient_clip}")
         print(f"   - Scheduler: {'OneCycleLR' if self.scheduler_step_per_batch else 'ReduceLROnPlateau'}")
         print(f"{'='*80}\n")

@@ -1,7 +1,7 @@
 DATA_CONFIG = {
     'data_root': 'split_dataset',
     'image_size': 224,
-    'batch_size': 128,  # INCREASED - RTX A4000 has 16GB, can handle more
+    'batch_size': 32,  # Smaller batch improves generalization for this dataset
     'num_workers': 4,  # Parallel data loading
     'pin_memory': True,  # Faster CPU to GPU transfer
     'persistent_workers': True,  # Keep workers alive between epochs
@@ -17,19 +17,20 @@ MODEL_CONFIG = {
 }
 
 TRAIN_CONFIG = {
-    'epochs': 50,  # More epochs for convergence
-    'learning_rate': 1e-3,  # HIGHER - faster learning
-    'max_lr': 5e-3,  # HIGHER peak for OneCycleLR
-    'weight_decay': 0.01,  # Reduced - less regularization for small dataset
-    'scheduler': 'onecycle',  # OneCycleLR for faster convergence
-    'early_stopping_patience': 15,
-    'label_smoothing': 0.05,  # REDUCED - was too aggressive
-    'dropout': 0.0,  # DISABLED - pretrained model already regularized
+    'epochs': 80,
+    'learning_rate': 2e-4,  # Lower LR for stable Swin fine-tuning
+    'max_lr': 8e-4,  # Conservative peak LR
+    'weight_decay': 0.02,
+    'scheduler': 'onecycle',
+    'early_stopping_patience': 20,
+    'label_smoothing': 0.0,
+    'dropout': 0.1,
     'use_mixup': False,  # DISABLED - too aggressive for this dataset
     'mixup_alpha': 0.2,
     'use_amp': True,  # Keep AMP for speed
     'gradient_clip': 1.0,
-    'warmup_epochs': 5,  # Longer warmup
+    'warmup_epochs': 8,
+    'use_class_weights': True,
 }
 
 OUTPUT_CONFIG = {
