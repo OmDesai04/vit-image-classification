@@ -14,7 +14,7 @@ class VisionTransformerClassifier(nn.Module):
     Uses a pretrained ViT backbone with a custom classification head.
     """
     
-    def __init__(self, num_classes, model_name='vit_base_patch32_224', pretrained=True, dropout=0.5):
+    def __init__(self, num_classes, model_name='swin_tiny_patch4_window7_224', pretrained=True, dropout=0.5):
         """
         Initialize the Vision Transformer model
         
@@ -44,12 +44,16 @@ class VisionTransformerClassifier(nn.Module):
             patch_size = 32
         elif 'patch16' in model_name:
             patch_size = 16
+        elif 'patch4' in model_name:
+            patch_size = 4
         
         num_patches = (224 // patch_size) ** 2
         
         print(f"\n{'='*60}")
+        architecture = "Swin Transformer" if "swin" in model_name.lower() else "Vision Transformer"
         print(f"MODEL CONFIGURATION")
         print(f"{'='*60}")
+        print(f"Architecture: {architecture}")
         print(f"Model: {model_name}")
         print(f"Patch Size: {patch_size}x{patch_size} ({'Larger patches = Less details' if patch_size == 32 else 'Smaller patches = More details'})")
         print(f"Number of Patches: {num_patches} ({224//patch_size}x{224//patch_size} grid)")
@@ -111,7 +115,7 @@ class VisionTransformerClassifier(nn.Module):
         return trainable_params, total_params
 
 
-def create_model(num_classes, model_name='vit_base_patch32_224', pretrained=True, freeze_backbone=False, dropout=0.5):
+def create_model(num_classes, model_name='swin_tiny_patch4_window7_224', pretrained=True, freeze_backbone=False, dropout=0.5):
     """
     Create and configure a Vision Transformer model
     
@@ -144,7 +148,7 @@ def create_model(num_classes, model_name='vit_base_patch32_224', pretrained=True
     return model
 
 
-def load_model(checkpoint_path, num_classes, model_name='vit_base_patch32_224', device='cuda', dropout=0.5):
+def load_model(checkpoint_path, num_classes, model_name='swin_tiny_patch4_window7_224', device='cuda', dropout=0.5):
     """
     Load a trained model from checkpoint
     
@@ -190,8 +194,11 @@ def load_model(checkpoint_path, num_classes, model_name='vit_base_patch32_224', 
     return model
 
 
-# Available ViT model variants in timm (as of 2026)
+# Available Transformer model variants in timm (as of 2026)
 AVAILABLE_MODELS = {
+    'swin_tiny_patch4_window7_224': 'Swin-Tiny (28M params) - Fast and strong baseline',
+    'swin_small_patch4_window7_224': 'Swin-Small (50M params) - Better accuracy',
+    'swin_base_patch4_window7_224': 'Swin-Base (88M params) - High accuracy',
     'vit_tiny_patch16_224': 'ViT-Tiny (5.54M params) - Smallest pure ViT (Current)',
     'vit_small_patch16_224': 'ViT-Small (22M params) - Good balance',
     'vit_base_patch16_224': 'ViT-Base (86M params) - High accuracy',
@@ -203,13 +210,13 @@ if __name__ == "__main__":
     """
     Test the model creation
     """
-    print("Testing Vision Transformer model creation...\n")
+    print("Testing Transformer model creation...\n")
     
     # Create a test model
     num_classes = 65  # Example: 65 classes (l=-32 to l=32)
     model = create_model(
         num_classes=num_classes,
-        model_name='vit_base_patch16_224',
+        model_name='swin_tiny_patch4_window7_224',
         pretrained=True,
         freeze_backbone=False
     )

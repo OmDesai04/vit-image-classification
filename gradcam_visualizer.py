@@ -24,7 +24,7 @@ from config import INFERENCE_CONFIG, DATA_CONFIG
 class GradCAMVisualizer:
     """Visualize attention and Grad-CAM for Vision Transformers"""
     
-    def __init__(self, model_path, class_names_path, model_name='mobilevit_s', device='cuda'):
+    def __init__(self, model_path, class_names_path, model_name='swin_tiny_patch4_window7_224', device='cuda'):
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         self.image_size = DATA_CONFIG['image_size']
         
@@ -78,6 +78,42 @@ class GradCAMVisualizer:
         mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
         std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
         return tensor * std + mean
+
+    def _load_image_as_pil(self, image_path):
+        """Load RGB image from standard formats or NumPy files (.npy/.noy)."""
+        image_path = Path(image_path)
+        if image_path.suffix.lower() in {'.npy', '.noy'}:
+            image_array = np.load(image_path)
+
+            if image_array.dtype in (np.float32, np.float64):
+                if image_array.max() <= 1.0:
+                    image_array = (image_array * 255).astype(np.uint8)
+                else:
+                    image_array = image_array.astype(np.uint8)
+            elif image_array.dtype == np.uint16:
+                img_min, img_max = image_array.min(), image_array.max()
+                if img_max > img_min:
+                    image_array = ((image_array - img_min) / (img_max - img_min) * 255).astype(np.uint8)
+                else:
+                    image_array = np.zeros_like(image_array, dtype=np.uint8)
+            elif image_array.dtype != np.uint8:
+                image_array = image_array.astype(np.uint8)
+
+            if image_array.ndim == 2:
+                image_array = np.stack([image_array, image_array, image_array], axis=-1)
+            elif image_array.ndim == 3:
+                if image_array.shape[0] in [1, 3] and image_array.shape[0] < image_array.shape[1]:
+                    image_array = np.transpose(image_array, (1, 2, 0))
+                if image_array.shape[2] == 1:
+                    image_array = np.repeat(image_array, 3, axis=2)
+
+            image = Image.fromarray(image_array)
+        else:
+            image = Image.open(image_path)
+
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        return image
     
     def get_attention_map(self, image_path):
         """
@@ -85,7 +121,7 @@ class GradCAMVisualizer:
         Returns attention heatmap
         """
         # Load and preprocess image
-        img = Image.open(image_path).convert('RGB')
+        img = self._load_image_as_pil(image_path)
         img_original = img.resize((self.image_size, self.image_size))
         
         transform = self._get_transform()
@@ -291,7 +327,7 @@ class GradCAMVisualizer:
         output_path.mkdir(exist_ok=True)
         
         image_dir = Path(image_dir)
-        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.npy', '.noy'}
         image_files = [f for f in image_dir.iterdir() 
                       if f.suffix.lower() in image_extensions]
         
@@ -318,13 +354,13 @@ def main():
     # ========================================================================
     # CONFIGURE YOUR PATHS HERE (or use command line arguments)
     # ========================================================================
-    DEFAULT_MODEL_PATH = r"C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\mobilevit.pth"        # Set to your .pth file path, e.g., 'C:/path/to/best_model.pth'
-    DEFAULT_CLASS_NAMES_PATH = r"C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\class_names.json"  # Set to your class_names.json path, e.g., 'C:/path/to/class_names.json'
+    DEFAULT_MODEL_PATH = r"C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\outputs\best_model.pth"        # Set to your .pth file path, e.g., 'C:/path/to/best_model.pth'
+    DEFAULT_CLASS_NAMES_PATH = r"C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\outputs\class_names.json"  # Set to your class_names.json path, e.g., 'C:/path/to/class_names.json'
     DEFAULT_IMAGE_DIR = None         # Set to your image directory path, e.g., 'C:/Users/YourName/Images'
     DEFAULT_IMAGE = r"C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\unused\l=-13\camera_frame_l-13_f59_20250918_102836.png"             # Set to your single image path, e.g., 'C:/Users/YourName/test.jpg'
     # ========================================================================
     
-    parser = argparse.ArgumentParser(description='Grad-CAM Visualization for ViT')
+    parser = argparse.ArgumentParser(description='Grad-CAM Visualization for Transformer models')
     parser.add_argument('--image', type=str, default=DEFAULT_IMAGE, help='Path to single input image')
     parser.add_argument('--image-dir', type=str, default=DEFAULT_IMAGE_DIR, help='Directory of images to process')
     parser.add_argument('--output', type=str, default='gradcam_output.png',
@@ -337,7 +373,7 @@ def main():
     parser.add_argument('--classes', type=str, 
                        default=DEFAULT_CLASS_NAMES_PATH if DEFAULT_CLASS_NAMES_PATH else INFERENCE_CONFIG['class_names_path'],
                        help='Path to class names JSON')
-    parser.add_argument('--model-name', type=str, default='mobilevit_s',
+    parser.add_argument('--model-name', type=str, default='swin_tiny_patch4_window7_224',
                        help='Model architecture name')
     parser.add_argument('--alpha', type=float, default=0.4,
                        help='Heatmap overlay transparency (0-1)')

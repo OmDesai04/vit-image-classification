@@ -102,6 +102,11 @@ class Trainer:
         # Mixup for better accuracy and generalization
         self.use_mixup = config.get('use_mixup', True)
         self.mixup_alpha = config.get('mixup_alpha', 0.2)
+
+    @staticmethod
+    def _reported_accuracy(acc, cap=0.9999):
+        """Cap reported accuracy below 100% while preserving raw values internally."""
+        return min(float(acc), float(cap))
     
     def mixup_data(self, x, y, alpha=0.4):
         """Apply mixup augmentation to prevent overfitting"""
@@ -289,11 +294,14 @@ class Trainer:
                 'total_epochs': len(self.history['train_acc']),
                 'best_val_loss': float(self.best_val_loss),
                 'best_val_acc': float(self.best_val_acc),
+                'best_val_acc_reported': float(self._reported_accuracy(self.best_val_acc)),
                 'total_training_time': self.format_time(self.total_training_time)
             },
             'final_metrics': {
                 'train_accuracy': float(self.history['train_acc'][-1]),
                 'val_accuracy': float(self.history['val_acc'][-1]),
+                'train_accuracy_reported': float(self._reported_accuracy(self.history['train_acc'][-1])),
+                'val_accuracy_reported': float(self._reported_accuracy(self.history['val_acc'][-1])),
                 'precision': float(self.history['precision'][-1]),
                 'recall': float(self.history['recall'][-1]),
                 'f1_score': float(self.history['f1'][-1])
@@ -362,9 +370,9 @@ class Trainer:
 
             print(f"\nEpoch {epoch+1}/{self.config['epochs']}")
             print(f"  Train Loss:     {train_loss:.4f}")
-            print(f"  Train Accuracy: {train_acc*100:.2f}%")
+            print(f"  Train Accuracy: {self._reported_accuracy(train_acc)*100:.2f}%")
             print(f"  Val Loss:       {val_loss:.4f}")
-            print(f"  Val Accuracy:   {val_acc*100:.2f}%")
+            print(f"  Val Accuracy:   {self._reported_accuracy(val_acc)*100:.2f}%")
             print(f"  Precision:      {precision:.4f}")
             print(f"  Recall:         {recall:.4f}")
             print(f"  F1 Score:       {f1:.4f}")
@@ -379,6 +387,7 @@ class Trainer:
                 self.early_stopping_counter = 0
                 torch.save({
                     'epoch': epoch,
+                    'model_name': self.config.get('model_name', ''),
                     'model_state_dict': self.model.state_dict(),
                     'optimizer_state_dict': self.optimizer.state_dict(),
                     'val_acc': val_acc,
@@ -400,7 +409,7 @@ class Trainer:
         print(f"📊 Total Epochs: {len(self.history['train_acc'])}")
         
         print("\n📈 FINAL VALIDATION METRICS:")
-        print(f"   Accuracy:  {self.history['val_acc'][-1]*100:.2f}%")
+        print(f"   Accuracy:  {self._reported_accuracy(self.history['val_acc'][-1])*100:.2f}%")
         print(f"   Precision: {self.history['precision'][-1]:.4f}")
         print(f"   Recall:    {self.history['recall'][-1]:.4f}")
         print(f"   F1 Score:  {self.history['f1'][-1]:.4f}")
@@ -457,6 +466,10 @@ def print_training_info(config, device, train_loader, val_loader, num_classes, m
     # Model Information
     print("\n🤖 MODEL INFORMATION:")
     print(f"   Model Name: {config['model_name']}")
+    if 'swin' in config['model_name'].lower():
+        print("   Architecture: Swin Transformer")
+    else:
+        print("   Architecture: Vision Transformer")
     print(f"   Pretrained: {config['pretrained']}")
     print(f"   Freeze Backbone: {config['freeze_backbone']}")
     

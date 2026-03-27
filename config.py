@@ -10,7 +10,7 @@ DATA_CONFIG = {
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_small_patch16_224',  # Upgraded to Small (22M params) - better for 64 classes
+    'model_name': 'swin_tiny_patch4_window7_224',  # Swin Transformer default
     'pretrained': True,
     'freeze_backbone': False,
     'use_compile': False,  # DISABLE - causing slowdown, use standard eager mode

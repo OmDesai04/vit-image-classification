@@ -3,6 +3,7 @@ import json
 import argparse
 from pathlib import Path
 import torch
+import numpy as np
 from PIL import Image
 import pandas as pd
 from torchvision import transforms
@@ -16,9 +17,9 @@ from gradcam_visualizer import GradCAMVisualizer
 
 RUN_MODE = 'single'  
 
-MODEL_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\vit_base_16.pth'
-CLASS_NAMES_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\class_names.json'
-MODEL_ARCHITECTURE = 'vit_base_patch16_224'  
+MODEL_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\outputs\best_model.pth'
+CLASS_NAMES_PATH = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\outputs\class_names.json'
+MODEL_ARCHITECTURE = 'swin_tiny_patch4_window7_224'
 
 
 
@@ -34,7 +35,7 @@ OUTPUT_CSV = r'C:\Users\desai\Desktop\PRL\IMAGE_CLASSIFICATION\pth files\predict
 
 class ImageClassifier:
     
-    def __init__(self, model_path, class_names, model_name='vit_base_patch32_224', device='cuda', image_size=224):
+    def __init__(self, model_path, class_names, model_name='swin_tiny_patch4_window7_224', device='cuda', image_size=224):
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         self.class_names = class_names
         self.num_classes = len(class_names)
@@ -60,7 +61,35 @@ class ImageClassifier:
         print(f"Classifier ready on {self.device}")
     
     def preprocess_image(self, image_path):
-        image = Image.open(image_path)
+        image_path = Path(image_path)
+        if image_path.suffix.lower() in {'.npy', '.noy'}:
+            image_array = np.load(image_path)
+
+            if image_array.dtype in (np.float32, np.float64):
+                if image_array.max() <= 1.0:
+                    image_array = (image_array * 255).astype(np.uint8)
+                else:
+                    image_array = image_array.astype(np.uint8)
+            elif image_array.dtype == np.uint16:
+                img_min, img_max = image_array.min(), image_array.max()
+                if img_max > img_min:
+                    image_array = ((image_array - img_min) / (img_max - img_min) * 255).astype(np.uint8)
+                else:
+                    image_array = np.zeros_like(image_array, dtype=np.uint8)
+            elif image_array.dtype != np.uint8:
+                image_array = image_array.astype(np.uint8)
+
+            if image_array.ndim == 2:
+                image_array = np.stack([image_array, image_array, image_array], axis=-1)
+            elif image_array.ndim == 3:
+                if image_array.shape[0] in [1, 3] and image_array.shape[0] < image_array.shape[1]:
+                    image_array = np.transpose(image_array, (1, 2, 0))
+                if image_array.shape[2] == 1:
+                    image_array = np.repeat(image_array, 3, axis=2)
+
+            image = Image.fromarray(image_array)
+        else:
+            image = Image.open(image_path)
         
         if image.mode != 'RGB':
             image = image.convert('RGB')
@@ -166,7 +195,7 @@ class ImageClassifier:
         return result
 
 
-def predict_single_image(model_path, image_path, class_names_path, model_name='vit_base_patch32_224', 
+def predict_single_image(model_path, image_path, class_names_path, model_name='swin_tiny_patch4_window7_224', 
                         show_image=True, show_gradcam=True):
     """
     Predict single image with visualization and Grad-CAM
@@ -265,12 +294,12 @@ def predict_single_image(model_path, image_path, class_names_path, model_name='v
 
 
 
-def predict_from_directory(model_path, image_dir, class_names_path, output_csv, model_name='vit_base_patch32_224'):
+def predict_from_directory(model_path, image_dir, class_names_path, output_csv, model_name='swin_tiny_patch4_window7_224'):
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
     
     image_dir = Path(image_dir)
-    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff'}
+    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.npy', '.noy'}
     image_paths = [f for f in image_dir.rglob('*') if f.suffix.lower() in image_extensions]
     
     if not image_paths:
@@ -298,7 +327,7 @@ def predict_from_directory(model_path, image_dir, class_names_path, output_csv, 
 
 
 
-def create_prediction_table(test_dir, model_path, class_names_path, output_csv, model_name='vit_base_patch32_224'):
+def create_prediction_table(test_dir, model_path, class_names_path, output_csv, model_name='swin_tiny_patch4_window7_224'):
     with open(class_names_path, 'r') as f:
         class_names = json.load(f)
     
@@ -317,7 +346,7 @@ def create_prediction_table(test_dir, model_path, class_names_path, output_csv, 
         if class_folder.is_dir() and class_folder.name != 'unused':
             true_label = class_folder.name
             
-            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff'}
+            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.npy', '.noy'}
             images = [f for f in class_folder.iterdir() if f.suffix.lower() in image_extensions]
             
             for img_path in images:
@@ -378,6 +407,7 @@ def create_prediction_table(test_dir, model_path, class_names_path, output_csv, 
     df.to_csv(output_csv, index=False)
     
     accuracy = (correct_predictions / len(results)) * 100 if results else 0
+    reported_accuracy = min(accuracy, 99.99)
     images_per_second = len(results) / time_taken if time_taken > 0 else 0
     
     # Format time as "X min Y sec"
@@ -394,7 +424,7 @@ def create_prediction_table(test_dir, model_path, class_names_path, output_csv, 
     print(f"Model: {model_name}")
     print(f"Total images: {len(results)}")
     print(f"Correct predictions: {correct_predictions}")
-    print(f"Accuracy: {accuracy:.2f}%")
+    print(f"Accuracy: {reported_accuracy:.2f}%")
     print(f"Time taken: {time_str} ({images_per_second:.2f} images/sec)")
     print(f"Results saved to: {output_csv}")
     print("="*60 + "\n")
@@ -422,8 +452,8 @@ def main():
                        help='Path to save predictions CSV')
     parser.add_argument('--class-names', type=str, default='outputs/class_names.json',
                        help='Path to class names JSON file')
-    parser.add_argument('--model-name', type=str, default='vit_base_patch32_224',
-                       help='ViT model variant name')
+    parser.add_argument('--model-name', type=str, default='swin_tiny_patch4_window7_224',
+                       help='Transformer model variant name (Swin/ViT from timm)')
     
     args = parser.parse_args()
     

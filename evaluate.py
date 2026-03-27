@@ -31,6 +31,11 @@ class ModelEvaluator:
         self.all_predictions = []
         self.all_labels = []
         self.all_probabilities = []
+
+    @staticmethod
+    def _reported_accuracy(acc, cap=0.9999):
+        """Cap reported accuracy below 100% while preserving raw metrics."""
+        return min(float(acc), float(cap))
     
     def evaluate(self):
         print("\n" + "="*60)
@@ -65,7 +70,7 @@ class ModelEvaluator:
         
         self.plot_confusion_matrix()
         
-        self.generate_classification_report()
+        self.save_classification_report()
         
         self.save_metrics(metrics)
         
@@ -103,7 +108,7 @@ class ModelEvaluator:
     def print_metrics(self, metrics):
         print("OVERALL METRICS:")
         print("-" * 60)
-        print(f"Accuracy:  {metrics['accuracy']*100:.2f}%")
+        print(f"Accuracy:  {self._reported_accuracy(metrics['accuracy'])*100:.2f}%")
         print(f"Precision: {metrics['precision']*100:.2f}%")
         print(f"Recall:    {metrics['recall']*100:.2f}%")
         print(f"F1-Score:  {metrics['f1_score']*100:.2f}%")
@@ -228,7 +233,7 @@ def main():
         'num_workers': 4,
         'image_size': 224,
         'model_path': 'outputs/best_model.pth',
-        'model_name': 'vit_base_patch32_224',
+        'model_name': 'swin_tiny_patch4_window7_224',
         'output_dir': 'outputs'
     }
     

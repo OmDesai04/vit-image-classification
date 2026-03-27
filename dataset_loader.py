@@ -65,8 +65,8 @@ class ImageClassificationDataset(Dataset):
             class_name = class_folder.name
             class_idx = self.class_to_idx[class_name]
             
-            # Support both regular images and .npy files
-            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.npy'}
+            # Support regular images and NumPy-based files (.npy/.noy)
+            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.npy', '.noy'}
             image_files = [
                 f for f in class_folder.iterdir()
                 if f.suffix.lower() in image_extensions
@@ -85,8 +85,8 @@ class ImageClassificationDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.image_paths[idx]
         
-        # Check if file is .npy format
-        if img_path.suffix.lower() == '.npy':
+        # Check if file is NumPy format
+        if img_path.suffix.lower() in {'.npy', '.noy'}:
             # Load numpy array
             image_array = np.load(img_path)
             
