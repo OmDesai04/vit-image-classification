@@ -196,6 +196,14 @@ def create_dataloaders(data_root='split_dataset',
                       persistent_workers=True,
                       prefetch_factor=2):
     data_root = Path(data_root)
+
+    available_cpus = os.cpu_count() or 1
+    effective_num_workers = min(max(int(num_workers), 0), available_cpus)
+    if effective_num_workers != num_workers:
+        print(
+            f"Adjusted num_workers from {num_workers} to {effective_num_workers} "
+            f"based on available CPU cores ({available_cpus})"
+        )
     
     train_dir = data_root / 'train'
     val_dir = data_root / 'val'
@@ -260,20 +268,20 @@ def create_dataloaders(data_root='split_dataset',
     print(f"Test samples: {len(test_dataset)}")
     print(f"Image size: {image_size}x{image_size}")
     print(f"Batch size: {batch_size}")
-    print(f"Num workers: {num_workers}")
+    print(f"Num workers: {effective_num_workers}")
     print(f"Pin memory: {pin_memory}")
-    print(f"Persistent workers: {persistent_workers if num_workers > 0 else 'N/A'}")
+    print(f"Persistent workers: {persistent_workers if effective_num_workers > 0 else 'N/A'}")
     print("="*60 + "\n")
     
     # Optimize dataloader settings for faster training
     dataloader_kwargs = {
         'batch_size': batch_size,
-        'num_workers': num_workers,
+        'num_workers': effective_num_workers,
         'pin_memory': pin_memory,
     }
     
     # Add persistent_workers and prefetch_factor only if num_workers > 0
-    if num_workers > 0:
+    if effective_num_workers > 0:
         dataloader_kwargs['persistent_workers'] = persistent_workers
         dataloader_kwargs['prefetch_factor'] = prefetch_factor
     

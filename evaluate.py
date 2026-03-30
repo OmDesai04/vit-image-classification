@@ -235,7 +235,7 @@ def main():
         'image_size': DATA_CONFIG.get('image_size', 224),
         'image_extensions': DATA_CONFIG.get('image_extensions', None),
         'model_path': 'outputs/best_model.pth',
-        'model_name': 'swin_tiny_patch4_window7_224',
+        'model_name': 'vit_base_patch16_224',
         'output_dir': 'outputs'
     }
     
