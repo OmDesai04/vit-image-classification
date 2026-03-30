@@ -228,6 +228,22 @@ def create_dataloaders(data_root='split_dataset',
         exclude_folders=['unused'],
         image_extensions=image_extensions
     )
+
+    if len(train_dataset) == 0:
+        raise ValueError(
+            f"No training images found in {train_dir}. "
+            f"Check folder structure and image_extensions={sorted(train_dataset.image_extensions)}"
+        )
+    if len(val_dataset) == 0:
+        raise ValueError(
+            f"No validation images found in {val_dir}. "
+            f"Check folder structure and image_extensions={sorted(val_dataset.image_extensions)}"
+        )
+    if len(test_dataset) == 0:
+        raise ValueError(
+            f"No test images found in {test_dir}. "
+            f"Check folder structure and image_extensions={sorted(test_dataset.image_extensions)}"
+        )
     
     assert train_dataset.class_names == val_dataset.class_names == test_dataset.class_names, \
         "Class names mismatch between train/val/test datasets"

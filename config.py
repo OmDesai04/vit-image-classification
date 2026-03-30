@@ -7,7 +7,7 @@ DATA_CONFIG = {
     'persistent_workers': True,  # Keep workers alive between epochs
     'prefetch_factor': 2,  # Prefetch batches for efficiency
     'crop_size': None,  # DISABLED - just resize directly
-    'image_extensions': ['.jpg', '.jpeg'],  # Focus training on JPG/JPEG files only
+    'image_extensions': ['.jpg', '.jpeg', '.png'],  # Include PNG to match current dataset
 }
 
 MODEL_CONFIG = {
