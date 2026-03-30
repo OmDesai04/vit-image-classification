@@ -117,9 +117,9 @@ class Trainer:
         self.mixup_alpha = config.get('mixup_alpha', 0.2)
 
     @staticmethod
-    def _reported_accuracy(acc, cap=0.9999):
-        """Cap reported accuracy below 100% while preserving raw values internally."""
-        return min(float(acc), float(cap))
+    def _reported_accuracy(acc):
+        """Return raw accuracy value for honest reporting."""
+        return float(acc)
     
     def mixup_data(self, x, y, alpha=0.4):
         """Apply mixup augmentation to prevent overfitting"""
@@ -541,6 +541,7 @@ def main():
         config['num_workers'],
         config['image_size'],
         config.get('crop_size', None),
+        config.get('image_extensions', None),
         config.get('pin_memory', True),
         config.get('persistent_workers', True),
         config.get('prefetch_factor', 2)

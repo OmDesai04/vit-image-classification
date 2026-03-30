@@ -7,6 +7,7 @@ DATA_CONFIG = {
     'persistent_workers': True,  # Keep workers alive between epochs
     'prefetch_factor': 2,  # Prefetch batches for efficiency
     'crop_size': None,  # DISABLED - just resize directly
+    'image_extensions': ['.jpg', '.jpeg'],  # Focus training on JPG/JPEG files only
 }
 
 MODEL_CONFIG = {
@@ -17,15 +18,15 @@ MODEL_CONFIG = {
 }
 
 TRAIN_CONFIG = {
-    'epochs': 80,
+    'epochs': 60,
     'learning_rate': 2e-4,  # Lower LR for stable Swin fine-tuning
     'max_lr': 8e-4,  # Conservative peak LR
-    'weight_decay': 0.02,
+    'weight_decay': 0.05,
     'scheduler': 'onecycle',
-    'early_stopping_patience': 20,
-    'label_smoothing': 0.0,
-    'dropout': 0.1,
-    'use_mixup': False,  # DISABLED - too aggressive for this dataset
+    'early_stopping_patience': 10,
+    'label_smoothing': 0.1,
+    'dropout': 0.3,
+    'use_mixup': True,
     'mixup_alpha': 0.2,
     'use_amp': True,  # Keep AMP for speed
     'gradient_clip': 1.0,

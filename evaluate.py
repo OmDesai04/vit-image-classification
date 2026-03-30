@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 from dataset_loader import create_dataloaders
 from model import load_model
+from config import DATA_CONFIG
 
 
 class ModelEvaluator:
@@ -33,9 +34,9 @@ class ModelEvaluator:
         self.all_probabilities = []
 
     @staticmethod
-    def _reported_accuracy(acc, cap=0.9999):
-        """Cap reported accuracy below 100% while preserving raw metrics."""
-        return min(float(acc), float(cap))
+    def _reported_accuracy(acc):
+        """Return raw accuracy value for honest reporting."""
+        return float(acc)
     
     def evaluate(self):
         print("\n" + "="*60)
@@ -228,10 +229,11 @@ class ModelEvaluator:
 
 def main():
     config = {
-        'data_root': 'split_dataset',
-        'batch_size': 32,
-        'num_workers': 4,
-        'image_size': 224,
+        'data_root': DATA_CONFIG.get('data_root', 'split_dataset'),
+        'batch_size': DATA_CONFIG.get('batch_size', 32),
+        'num_workers': DATA_CONFIG.get('num_workers', 4),
+        'image_size': DATA_CONFIG.get('image_size', 224),
+        'image_extensions': DATA_CONFIG.get('image_extensions', None),
         'model_path': 'outputs/best_model.pth',
         'model_name': 'swin_tiny_patch4_window7_224',
         'output_dir': 'outputs'
@@ -255,7 +257,8 @@ def main():
         batch_size=config['batch_size'],
         num_workers=config['num_workers'],
         image_size=config['image_size'],
-        crop_size=config.get('crop_size', None)
+        crop_size=config.get('crop_size', None),
+        image_extensions=config.get('image_extensions', None)
     )
     
     print("\nLoading trained model...")

@@ -37,10 +37,14 @@ class RandomCornerCrop:
 
 class ImageClassificationDataset(Dataset):
     
-    def __init__(self, root_dir, transform=None, exclude_folders=None):
+    def __init__(self, root_dir, transform=None, exclude_folders=None, image_extensions=None):
         self.root_dir = Path(root_dir)
         self.transform = transform
         self.exclude_folders = exclude_folders or []
+        self.image_extensions = {
+            ext.lower() if ext.startswith('.') else f'.{ext.lower()}'
+            for ext in (image_extensions or ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.npy', '.noy'])
+        }
         
         self.image_paths = []
         self.labels = []
@@ -65,11 +69,9 @@ class ImageClassificationDataset(Dataset):
             class_name = class_folder.name
             class_idx = self.class_to_idx[class_name]
             
-            # Support regular images and NumPy-based files (.npy/.noy)
-            image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.npy', '.noy'}
             image_files = [
                 f for f in class_folder.iterdir()
-                if f.suffix.lower() in image_extensions
+                if f.suffix.lower() in self.image_extensions
             ]
             
             for img_path in image_files:
@@ -158,11 +160,14 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
         crop_size: Size to center crop (removes edge information, focuses on center)
     """
     if is_training:
-        # MINIMAL augmentation - dataset is small, don't distort too much
+        # Moderate augmentation to reduce overfitting and keep validation accuracy realistic.
         transform_list = [
             transforms.Resize((image_size, image_size)),
-            transforms.RandomHorizontalFlip(p=0.5),  # Only basic flip
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(degrees=8),
+            transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.10, hue=0.03),
             transforms.ToTensor(),
+            transforms.RandomErasing(p=0.2, scale=(0.02, 0.08), ratio=(0.3, 3.3), value='random'),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                std=[0.229, 0.224, 0.225]),
         ]
@@ -186,6 +191,7 @@ def create_dataloaders(data_root='split_dataset',
                       num_workers=4,
                       image_size=224,
                       crop_size=None,
+                      image_extensions=None,
                       pin_memory=True,
                       persistent_workers=True,
                       prefetch_factor=2):
@@ -205,19 +211,22 @@ def create_dataloaders(data_root='split_dataset',
     train_dataset = ImageClassificationDataset(
         train_dir, 
         transform=train_transform,
-        exclude_folders=['unused']
+        exclude_folders=['unused'],
+        image_extensions=image_extensions
     )
     
     val_dataset = ImageClassificationDataset(
         val_dir, 
         transform=val_transform,
-        exclude_folders=['unused']
+        exclude_folders=['unused'],
+        image_extensions=image_extensions
     )
     
     test_dataset = ImageClassificationDataset(
         test_dir, 
         transform=val_transform,
-        exclude_folders=['unused']
+        exclude_folders=['unused'],
+        image_extensions=image_extensions
     )
     
     assert train_dataset.class_names == val_dataset.class_names == test_dataset.class_names, \
