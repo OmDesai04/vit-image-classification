@@ -7,11 +7,13 @@ DATA_CONFIG = {
     'persistent_workers': True,  # Keep workers alive between epochs
     'prefetch_factor': 2,  # Prefetch batches for efficiency
     'crop_size': None,  # DISABLED - just resize directly
-    'image_extensions': ['.npy'],  # Train only on NumPy image files
+    'image_extensions': ['.png'],  # Train only on PNG image files
+    'check_split_overlap': True,  # Detect duplicate samples across train/val/test
+    'split_overlap_strict': True,  # Stop training if leakage is detected
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_base_patch16_224',  # ViT-Base Patch16
+    'model_name': 'swin_tiny_patch4_window7_224',  # Swin Transformer default
     'pretrained': True,
     'freeze_backbone': False,
     'use_compile': False,  # DISABLE - causing slowdown, use standard eager mode
