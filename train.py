@@ -352,6 +352,8 @@ class Trainer:
         print(f"🚀 Starting Training with:")
         print(f"   - Mixed Precision (AMP): {'✓' if self.use_amp else '✗'}")
         print(f"   - Mixup Augmentation: {'✓' if self.use_mixup else '✗'}")
+        if self.use_mixup:
+            print("   - Note: Train accuracy under MixUp is a proxy and may appear lower than validation accuracy")
         print(f"   - Class Weighted Loss: {'✓' if self.config.get('use_class_weights', False) else '✗'}")
         print(f"   - Gradient Clipping: {self.gradient_clip}")
         print(f"   - Scheduler: {'OneCycleLR' if self.scheduler_step_per_batch else 'ReduceLROnPlateau'}")
@@ -542,6 +544,8 @@ def main():
         config['image_size'],
         config.get('crop_size', None),
         config.get('image_extensions', None),
+        config.get('check_split_overlap', True),
+        config.get('split_overlap_strict', True),
         config.get('pin_memory', True),
         config.get('persistent_workers', True),
         config.get('prefetch_factor', 2)

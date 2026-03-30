@@ -1,4 +1,5 @@
 import os
+import hashlib
 from pathlib import Path
 import numpy as np
 from PIL import Image
@@ -186,12 +187,61 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
     return transform
 
 
+def _hash_file(path):
+    """Compute a stable MD5 hash for a file to detect duplicate samples across splits."""
+    digest = hashlib.md5()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _build_hash_map(image_paths):
+    hash_to_paths = {}
+    for path in image_paths:
+        file_hash = _hash_file(path)
+        hash_to_paths.setdefault(file_hash, []).append(str(path))
+    return hash_to_paths
+
+
+def _find_split_overlaps(train_dataset, val_dataset, test_dataset):
+    train_hashes = _build_hash_map(train_dataset.image_paths)
+    val_hashes = _build_hash_map(val_dataset.image_paths)
+    test_hashes = _build_hash_map(test_dataset.image_paths)
+
+    train_set = set(train_hashes.keys())
+    val_set = set(val_hashes.keys())
+    test_set = set(test_hashes.keys())
+
+    overlaps = {
+        'train_val': sorted(train_set & val_set),
+        'train_test': sorted(train_set & test_set),
+        'val_test': sorted(val_set & test_set),
+    }
+
+    detailed = {}
+    for pair_name, shared_hashes in overlaps.items():
+        pair_paths = []
+        for h in shared_hashes[:5]:
+            if pair_name == 'train_val':
+                pair_paths.append((train_hashes[h][0], val_hashes[h][0]))
+            elif pair_name == 'train_test':
+                pair_paths.append((train_hashes[h][0], test_hashes[h][0]))
+            else:
+                pair_paths.append((val_hashes[h][0], test_hashes[h][0]))
+        detailed[pair_name] = pair_paths
+
+    return overlaps, detailed
+
+
 def create_dataloaders(data_root='split_dataset', 
                       batch_size=32, 
                       num_workers=4,
                       image_size=224,
                       crop_size=None,
                       image_extensions=None,
+                      check_split_overlap=True,
+                      split_overlap_strict=True,
                       pin_memory=True,
                       persistent_workers=True,
                       prefetch_factor=2):
@@ -252,6 +302,33 @@ def create_dataloaders(data_root='split_dataset',
             f"No test images found in {test_dir}. "
             f"Check folder structure and image_extensions={sorted(test_dataset.image_extensions)}"
         )
+
+    if check_split_overlap:
+        overlaps, detailed_pairs = _find_split_overlaps(train_dataset, val_dataset, test_dataset)
+        total_overlap = sum(len(v) for v in overlaps.values())
+        if total_overlap > 0:
+            overlap_lines = [
+                f"train-val duplicates: {len(overlaps['train_val'])}",
+                f"train-test duplicates: {len(overlaps['train_test'])}",
+                f"val-test duplicates: {len(overlaps['val_test'])}",
+            ]
+            examples = []
+            for pair_name, pair_examples in detailed_pairs.items():
+                if pair_examples:
+                    left, right = pair_examples[0]
+                    examples.append(f"{pair_name} sample: {left} <-> {right}")
+
+            message = (
+                "Detected duplicate files across dataset splits, which can inflate validation/test accuracy.\n"
+                + "\n".join(overlap_lines)
+            )
+            if examples:
+                message += "\nExamples:\n" + "\n".join(examples)
+
+            if split_overlap_strict:
+                raise ValueError(message)
+            else:
+                print(f"WARNING: {message}")
     
     assert train_dataset.class_names == val_dataset.class_names == test_dataset.class_names, \
         "Class names mismatch between train/val/test datasets"
@@ -271,6 +348,7 @@ def create_dataloaders(data_root='split_dataset',
     print(f"Num workers: {effective_num_workers}")
     print(f"Pin memory: {pin_memory}")
     print(f"Persistent workers: {persistent_workers if effective_num_workers > 0 else 'N/A'}")
+    print(f"Split overlap check: {'enabled' if check_split_overlap else 'disabled'}")
     print("="*60 + "\n")
     
     # Optimize dataloader settings for faster training
