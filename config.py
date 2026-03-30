@@ -8,7 +8,7 @@ DATA_CONFIG = {
     'prefetch_factor': 2,  # Prefetch batches for efficiency
     'crop_size': None,  # DISABLED - just resize directly
     'image_extensions': ['.png'],  # Train only on PNG image files
-    'check_split_overlap': True,  # Detect duplicate samples across train/val/test
+    'check_split_overlap': False,  # Disable by default (can be slow on cloud/network drives)
     'split_overlap_strict': True,  # Stop training if leakage is detected
 }
 

@@ -188,11 +188,14 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
 
 
 def _hash_file(path):
-    """Compute a stable MD5 hash for a file to detect duplicate samples across splits."""
+    """Compute a fast signature to detect duplicates across splits without full-file hashing."""
+    path = Path(path)
+    size = path.stat().st_size
     digest = hashlib.md5()
     with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b''):
-            digest.update(chunk)
+        head = f.read(64 * 1024)
+    digest.update(head)
+    digest.update(str(size).encode('utf-8'))
     return digest.hexdigest()
 
 
@@ -205,6 +208,7 @@ def _build_hash_map(image_paths):
 
 
 def _find_split_overlaps(train_dataset, val_dataset, test_dataset):
+    print("Checking split overlap (fast mode)...")
     train_hashes = _build_hash_map(train_dataset.image_paths)
     val_hashes = _build_hash_map(val_dataset.image_paths)
     test_hashes = _build_hash_map(test_dataset.image_paths)
@@ -231,6 +235,7 @@ def _find_split_overlaps(train_dataset, val_dataset, test_dataset):
                 pair_paths.append((val_hashes[h][0], test_hashes[h][0]))
         detailed[pair_name] = pair_paths
 
+    print("Split overlap check completed.")
     return overlaps, detailed
 
 
