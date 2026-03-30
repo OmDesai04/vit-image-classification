@@ -188,13 +188,37 @@ def get_transforms(image_size=224, is_training=True, crop_size=None):
 
 
 def _hash_file(path):
-    """Compute a fast signature to detect duplicates across splits without full-file hashing."""
+    """Compute a fast content signature to detect duplicates across splits."""
     path = Path(path)
-    size = path.stat().st_size
     digest = hashlib.md5()
+
+    # For NumPy files, hash shape/dtype and sampled tensor content.
+    if path.suffix.lower() in {'.npy', '.noy'}:
+        arr = np.load(path, mmap_mode='r')
+        flat = arr.reshape(-1)
+        sample_size = min(4096, flat.size)
+        head = np.asarray(flat[:sample_size])
+        tail = np.asarray(flat[-sample_size:]) if flat.size > sample_size else head
+
+        digest.update(str(arr.shape).encode('utf-8'))
+        digest.update(str(arr.dtype).encode('utf-8'))
+        digest.update(head.tobytes())
+        digest.update(tail.tobytes())
+        digest.update(str(flat.size).encode('utf-8'))
+        return digest.hexdigest()
+
+    # For standard image files, hash file size + start/end chunks.
+    size = path.stat().st_size
     with open(path, 'rb') as f:
         head = f.read(64 * 1024)
+        if size > 64 * 1024:
+            f.seek(max(size - 64 * 1024, 0))
+            tail = f.read(64 * 1024)
+        else:
+            tail = head
+
     digest.update(head)
+    digest.update(tail)
     digest.update(str(size).encode('utf-8'))
     return digest.hexdigest()
 
