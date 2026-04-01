@@ -16,7 +16,27 @@ from tqdm import tqdm
 
 from dataset_loader import create_dataloaders
 from model import load_model
-from config import DATA_CONFIG
+from config import DATA_CONFIG, MODEL_CONFIG, INFERENCE_CONFIG
+
+
+def infer_model_name_from_checkpoint_path(model_path: Path, default_model_name: str) -> str:
+    """Infer timm model name from checkpoint filename when metadata is unavailable."""
+    stem = model_path.stem.lower()
+    mapping = {
+        'vit_base_16': 'vit_base_patch16_224',
+        'vit_base_32': 'vit_base_patch32_224',
+        'vit_tiny_16': 'vit_tiny_patch16_224',
+        'mobilevit': 'mobilevit_s.cvnets_in1k',
+        'swin_tiny': 'swin_tiny_patch4_window7_224',
+        'swin_small': 'swin_small_patch4_window7_224',
+        'swin_base': 'swin_base_patch4_window7_224',
+    }
+
+    for key, model_name in mapping.items():
+        if key in stem:
+            return model_name
+
+    return default_model_name
 
 
 class ModelEvaluator:
@@ -233,16 +253,28 @@ def main():
         'batch_size': DATA_CONFIG.get('batch_size', 32),
         'num_workers': DATA_CONFIG.get('num_workers', 4),
         'image_size': DATA_CONFIG.get('image_size', 224),
+        'crop_size': DATA_CONFIG.get('crop_size', None),
         'image_extensions': DATA_CONFIG.get('image_extensions', None),
-        'model_path': 'outputs/best_model.pth',
-        'model_name': 'swin_tiny_patch4_window7_224',
-        'output_dir': 'outputs'
+        'check_split_overlap': DATA_CONFIG.get('check_split_overlap', True),
+        'split_overlap_strict': DATA_CONFIG.get('split_overlap_strict', True),
+        'pin_memory': DATA_CONFIG.get('pin_memory', True),
+        'persistent_workers': DATA_CONFIG.get('persistent_workers', True),
+        'prefetch_factor': DATA_CONFIG.get('prefetch_factor', 2),
+        'model_path': INFERENCE_CONFIG.get('model_path', 'outputs/best_model.pth'),
+        'class_names_path': INFERENCE_CONFIG.get('class_names_path', 'outputs/class_names.json'),
+        'model_name': MODEL_CONFIG.get('model_name', 'swin_tiny_patch4_window7_224'),
+        'output_dir': INFERENCE_CONFIG.get('eval_output_dir', 'outputs/eval')
     }
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"\nUsing device: {device}")
     
-    class_names_path = Path(config['output_dir']) / 'class_names.json'
+    model_path = Path(config['model_path'])
+    class_names_path = Path(config['class_names_path'])
+
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model checkpoint not found at {model_path}")
+
     if not class_names_path.exists():
         raise FileNotFoundError(f"Class names file not found at {class_names_path}. Please run training first.")
     
@@ -258,14 +290,26 @@ def main():
         num_workers=config['num_workers'],
         image_size=config['image_size'],
         crop_size=config.get('crop_size', None),
-        image_extensions=config.get('image_extensions', None)
+        image_extensions=config.get('image_extensions', None),
+        check_split_overlap=config.get('check_split_overlap', True),
+        split_overlap_strict=config.get('split_overlap_strict', True),
+        pin_memory=config.get('pin_memory', True),
+        persistent_workers=config.get('persistent_workers', True),
+        prefetch_factor=config.get('prefetch_factor', 2)
     )
+
+    # Prefer architecture saved in checkpoint to avoid accidental model/weights mismatch.
+    checkpoint = torch.load(model_path, map_location='cpu')
+    checkpoint_model_name = checkpoint.get('model_name') if isinstance(checkpoint, dict) else None
+    inferred_model_name = infer_model_name_from_checkpoint_path(model_path, config['model_name'])
+    resolved_model_name = checkpoint_model_name or inferred_model_name
+    print(f"Resolved model architecture: {resolved_model_name}")
     
     print("\nLoading trained model...")
     model = load_model(
-        checkpoint_path=config['model_path'],
+        checkpoint_path=model_path,
         num_classes=num_classes,
-        model_name=config['model_name'],
+        model_name=resolved_model_name,
         device=device
     )
     
@@ -278,6 +322,10 @@ def main():
     )
     
     metrics = evaluator.evaluate()
+
+    if metrics.get('accuracy', 0.0) >= 0.9999:
+        print("\nWARNING: Test accuracy is ~100%. This often indicates an easy test set or train/test leakage.")
+        print("Re-check split generation and ensure the test set is fully held-out from training.")
     
     evaluator.save_predictions_table()
     

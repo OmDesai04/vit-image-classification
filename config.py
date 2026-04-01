@@ -8,7 +8,7 @@ DATA_CONFIG = {
     'prefetch_factor': 2,  # Prefetch batches for efficiency
     'crop_size': None,  # DISABLED - just resize directly
     'image_extensions': ['.png'],  # Train only on PNG image files
-    'check_split_overlap': False,  # Disable by default (can be slow on cloud/network drives)
+    'check_split_overlap': True,  # Keep enabled to catch leakage between train/val/test
     'split_overlap_strict': True,  # Stop training if leakage is detected
 }
 
@@ -20,7 +20,7 @@ MODEL_CONFIG = {
 }
 
 TRAIN_CONFIG = {
-    'epochs': 60,
+    'epochs': 30,
     'learning_rate': 1.5e-4,  # Stable LR for ViT-Base fine-tuning
     'max_lr': 6e-4,  # Slightly lower peak LR for better generalization
     'weight_decay': 0.05,
@@ -43,9 +43,10 @@ OUTPUT_CONFIG = {
 }
 
 INFERENCE_CONFIG = {
-    'model_path': 'outputs/best_model.pth',
-    'class_names_path': 'outputs/class_names.json',
+    'model_path': 'pth files/vit_base_16.pth',
+    'class_names_path': 'pth files/class_names.json',
     'default_output': 'outputs/predictions.csv',
+    'eval_output_dir': 'outputs/eval',
 }
 
 DEVICE_CONFIG = {
