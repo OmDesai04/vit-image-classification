@@ -8,7 +8,8 @@ DATA_CONFIG = {
     'prefetch_factor': 2,  # Prefetch batches for efficiency
     'crop_size': None,  # DISABLED - just resize directly
     'image_extensions': ['.npy'],  # Train only on NPY image files
-    'check_split_overlap': True,  # Keep enabled to catch leakage between train/val/test
+    'check_split_overlap': True,  # Keep enabled to reduce leakage risk
+    'check_split_overlap_mode': 'filename',  # Fast check using filename+size signatures
     'split_overlap_strict': True,  # Stop training if leakage is detected
 }
 

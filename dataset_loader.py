@@ -231,11 +231,27 @@ def _build_hash_map(image_paths):
     return hash_to_paths
 
 
-def _find_split_overlaps(train_dataset, val_dataset, test_dataset):
-    print("Checking split overlap (fast mode)...")
-    train_hashes = _build_hash_map(train_dataset.image_paths)
-    val_hashes = _build_hash_map(val_dataset.image_paths)
-    test_hashes = _build_hash_map(test_dataset.image_paths)
+def _build_name_size_signature_map(image_paths):
+    signature_to_paths = {}
+    for path in image_paths:
+        p = Path(path)
+        signature = f"{p.name.lower()}::{p.stat().st_size}"
+        signature_to_paths.setdefault(signature, []).append(str(p))
+    return signature_to_paths
+
+
+def _find_split_overlaps(train_dataset, val_dataset, test_dataset, overlap_mode='hash'):
+    overlap_mode = (overlap_mode or 'hash').lower()
+    if overlap_mode == 'filename':
+        print("Checking split overlap (filename mode)...")
+        train_hashes = _build_name_size_signature_map(train_dataset.image_paths)
+        val_hashes = _build_name_size_signature_map(val_dataset.image_paths)
+        test_hashes = _build_name_size_signature_map(test_dataset.image_paths)
+    else:
+        print("Checking split overlap (content-hash mode)...")
+        train_hashes = _build_hash_map(train_dataset.image_paths)
+        val_hashes = _build_hash_map(val_dataset.image_paths)
+        test_hashes = _build_hash_map(test_dataset.image_paths)
 
     train_set = set(train_hashes.keys())
     val_set = set(val_hashes.keys())
@@ -270,6 +286,7 @@ def create_dataloaders(data_root='split_dataset',
                       crop_size=None,
                       image_extensions=None,
                       check_split_overlap=True,
+                      check_split_overlap_mode='hash',
                       split_overlap_strict=True,
                       pin_memory=True,
                       persistent_workers=True,
@@ -333,7 +350,12 @@ def create_dataloaders(data_root='split_dataset',
         )
 
     if check_split_overlap:
-        overlaps, detailed_pairs = _find_split_overlaps(train_dataset, val_dataset, test_dataset)
+        overlaps, detailed_pairs = _find_split_overlaps(
+            train_dataset,
+            val_dataset,
+            test_dataset,
+            overlap_mode=check_split_overlap_mode
+        )
         total_overlap = sum(len(v) for v in overlaps.values())
         if total_overlap > 0:
             overlap_lines = [
@@ -377,7 +399,10 @@ def create_dataloaders(data_root='split_dataset',
     print(f"Num workers: {effective_num_workers}")
     print(f"Pin memory: {pin_memory}")
     print(f"Persistent workers: {persistent_workers if effective_num_workers > 0 else 'N/A'}")
-    print(f"Split overlap check: {'enabled' if check_split_overlap else 'disabled'}")
+    if check_split_overlap:
+        print(f"Split overlap check: enabled ({check_split_overlap_mode})")
+    else:
+        print("Split overlap check: disabled")
     print("="*60 + "\n")
     
     # Optimize dataloader settings for faster training

@@ -545,6 +545,7 @@ def main():
         config.get('crop_size', None),
         config.get('image_extensions', None),
         config.get('check_split_overlap', True),
+        config.get('check_split_overlap_mode', 'hash'),
         config.get('split_overlap_strict', True),
         config.get('pin_memory', True),
         config.get('persistent_workers', True),

@@ -14,7 +14,7 @@ from sklearn.metrics import (
 )
 from tqdm import tqdm
 
-from dataset_loader import create_dataloaders
+from dataset_loader import create_dataloaders, _find_split_overlaps
 from model import load_model
 from config import DATA_CONFIG, MODEL_CONFIG, INFERENCE_CONFIG
 
@@ -256,6 +256,7 @@ def main():
         'crop_size': DATA_CONFIG.get('crop_size', None),
         'image_extensions': DATA_CONFIG.get('image_extensions', None),
         'check_split_overlap': DATA_CONFIG.get('check_split_overlap', True),
+        'check_split_overlap_mode': DATA_CONFIG.get('check_split_overlap_mode', 'hash'),
         'split_overlap_strict': DATA_CONFIG.get('split_overlap_strict', True),
         'pin_memory': DATA_CONFIG.get('pin_memory', True),
         'persistent_workers': DATA_CONFIG.get('persistent_workers', True),
@@ -284,7 +285,7 @@ def main():
     num_classes = len(class_names)
     
     print("\nLoading test dataset...")
-    _, _, test_loader, _, _ = create_dataloaders(
+    train_loader, val_loader, test_loader, _, _ = create_dataloaders(
         data_root=config['data_root'],
         batch_size=config['batch_size'],
         num_workers=config['num_workers'],
@@ -292,6 +293,7 @@ def main():
         crop_size=config.get('crop_size', None),
         image_extensions=config.get('image_extensions', None),
         check_split_overlap=config.get('check_split_overlap', True),
+        check_split_overlap_mode=config.get('check_split_overlap_mode', 'hash'),
         split_overlap_strict=config.get('split_overlap_strict', True),
         pin_memory=config.get('pin_memory', True),
         persistent_workers=config.get('persistent_workers', True),
@@ -326,6 +328,20 @@ def main():
     if metrics.get('accuracy', 0.0) >= 0.9999:
         print("\nWARNING: Test accuracy is ~100%. This often indicates an easy test set or train/test leakage.")
         print("Re-check split generation and ensure the test set is fully held-out from training.")
+
+        # If fast overlap mode is enabled, run one strict content-hash pass only when results look suspicious.
+        if config.get('check_split_overlap', True) and config.get('check_split_overlap_mode', 'hash') != 'hash':
+            print("\nRunning strict overlap verification (content-hash mode) due to perfect accuracy...")
+            overlaps, _ = _find_split_overlaps(
+                train_loader.dataset,
+                val_loader.dataset,
+                test_loader.dataset,
+                overlap_mode='hash'
+            )
+            overlap_counts = {k: len(v) for k, v in overlaps.items()}
+            print(f"Strict overlap counts: {overlap_counts}")
+            if sum(overlap_counts.values()) > 0:
+                print("CRITICAL: Duplicate content found across splits. Reported accuracy is likely inflated by leakage.")
     
     evaluator.save_predictions_table()
     
