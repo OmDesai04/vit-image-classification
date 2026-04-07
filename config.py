@@ -9,12 +9,12 @@ DATA_CONFIG = {
     'crop_size': None,  # DISABLED - just resize directly
     'image_extensions': ['.npy'],  # Train only on NPY image files
     'check_split_overlap': True,  # Keep enabled to reduce leakage risk
-    'check_split_overlap_mode': 'filename',  # Fast check using filename+size signatures
+    'check_split_overlap_mode': 'hash',  # Strong check using content signatures to catch renamed duplicates
     'split_overlap_strict': True,  # Stop training if leakage is detected
 }
 
 MODEL_CONFIG = {
-    'model_name': 'vit_base_patch16_224',  # ViT-Base/16
+    'model_name': 'mobilevit_s.cvnets_in1k',  # MobileViT
     'pretrained': True,
     'freeze_backbone': False,
     'use_compile': False,  # DISABLE - causing slowdown, use standard eager mode
@@ -44,7 +44,7 @@ OUTPUT_CONFIG = {
 }
 
 INFERENCE_CONFIG = {
-    'model_path': 'pth files/vit_base_16.pth',
+    'model_path': 'pth files/mobilevit.pth',
     'class_names_path': 'pth files/class_names.json',
     'default_output': 'outputs/predictions.csv',
     'eval_output_dir': 'outputs/eval',

@@ -179,7 +179,11 @@ class Trainer:
 
             total_loss += loss.item() * images.size(0)
             preds = torch.argmax(outputs, dim=1)
-            correct += (preds == labels).sum().item()
+            if self.use_mixup:
+                # Mixup-adjusted accuracy: each sample contributes to both targets by lam.
+                correct += lam * (preds == y_a).sum().item() + (1 - lam) * (preds == y_b).sum().item()
+            else:
+                correct += (preds == labels).sum().item()
             total += labels.size(0)
             
             # Step scheduler per batch if using OneCycleLR (after optimizer.step)
@@ -353,7 +357,7 @@ class Trainer:
         print(f"   - Mixed Precision (AMP): {'✓' if self.use_amp else '✗'}")
         print(f"   - Mixup Augmentation: {'✓' if self.use_mixup else '✗'}")
         if self.use_mixup:
-            print("   - Note: Train accuracy under MixUp is a proxy and may appear lower than validation accuracy")
+            print("   - Note: Train accuracy is MixUp-adjusted and not directly comparable to non-MixUp runs")
         print(f"   - Class Weighted Loss: {'✓' if self.config.get('use_class_weights', False) else '✗'}")
         print(f"   - Gradient Clipping: {self.gradient_clip}")
         print(f"   - Scheduler: {'OneCycleLR' if self.scheduler_step_per_batch else 'ReduceLROnPlateau'}")

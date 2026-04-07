@@ -199,9 +199,11 @@ AVAILABLE_MODELS = {
     'swin_tiny_patch4_window7_224': 'Swin-Tiny (28M params) - Fast and strong baseline',
     'swin_small_patch4_window7_224': 'Swin-Small (50M params) - Better accuracy',
     'swin_base_patch4_window7_224': 'Swin-Base (88M params) - High accuracy',
+    'mobilevit_s.cvnets_in1k': 'MobileViT-S (~5.6M params) - Lightweight and efficient',
     'vit_tiny_patch16_224': 'ViT-Tiny (5.54M params) - Smallest pure ViT (Current)',
     'vit_small_patch16_224': 'ViT-Small (22M params) - Good balance',
     'vit_base_patch16_224': 'ViT-Base (86M params) - High accuracy',
+    'vit_base_patch32_224': 'ViT-Base/32 (88M params) - Larger patch variant',
     'vit_large_patch16_224': 'ViT-Large (304M params) - Most accurate',
 }
 
