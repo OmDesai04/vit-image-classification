@@ -8,9 +8,7 @@ DATA_CONFIG = {
     'prefetch_factor': 2,  # Prefetch batches for efficiency
     'crop_size': None,  # DISABLED - just resize directly
     'image_extensions': ['.npy'],  # Train only on NPY image files
-    'check_split_overlap': True,  # Keep enabled to reduce leakage risk
-    'check_split_overlap_mode': 'hash',  # Strong check using content signatures to catch renamed duplicates
-    'split_overlap_strict': True,  # Stop training if leakage is detected
+    'check_split_overlap': False,  # Disabled as requested
 }
 
 MODEL_CONFIG = {
@@ -21,16 +19,16 @@ MODEL_CONFIG = {
 }
 
 TRAIN_CONFIG = {
-    'epochs': 30,
+    'epochs': 20,
     'learning_rate': 1.5e-4,  # Stable LR for ViT-Base fine-tuning
     'max_lr': 6e-4,  # Slightly lower peak LR for better generalization
     'weight_decay': 0.05,
     'scheduler': 'onecycle',
-    'early_stopping_patience': 10,
+    'early_stopping_patience': 5,
     'label_smoothing': 0.15,
-    'dropout': 0.4,
+    'dropout': 0.5,
     'use_mixup': True,
-    'mixup_alpha': 0.4,
+    'mixup_alpha': 0.8,
     'use_amp': True,  # Keep AMP for speed
     'gradient_clip': 1.0,
     'warmup_epochs': 8,
